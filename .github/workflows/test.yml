@@ -1,0 +1,88 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+        service: [fixtures-service, odds-service, main-service]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: backend/${{ matrix.service }}/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: backend/${{ matrix.service }}
+      run: npm ci
+    
+    - name: Run tests
+      working-directory: backend/${{ matrix.service }}
+      run: npm test --if-present
+    
+    - name: Lint code
+      working-directory: backend/${{ matrix.service }}
+      run: npm run lint --if-present
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: frontend
+      run: npm ci
+    
+    - name: Run type check
+      working-directory: frontend
+      run: npm run type-check --if-present
+    
+    - name: Build frontend
+      working-directory: frontend
+      run: npm run build
+    
+    - name: Run tests
+      working-directory: frontend
+      run: npm test --if-present
+    
+    - name: Lint code
+      working-directory: frontend
+      run: npm run lint --if-present
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run npm audit on all services
+      run: |
+        cd backend/fixtures-service && npm audit --audit-level=high
+        cd ../odds-service && npm audit --audit-level=high
+        cd ../main-service && npm audit --audit-level=high
+        cd ../../frontend && npm audit --audit-level=high 
