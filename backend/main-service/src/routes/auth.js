@@ -1,11 +1,80 @@
 const express = require('express');
-const passport = require('passport');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
+const { memoryDB } = require('../config/database');
+const passport = require('passport');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
+
+// JWT token generation
+const generateToken = (userId) => {
+  return jwt.sign(
+    { userId },
+    process.env.JWT_SECRET || 'your-fallback-secret',
+    { expiresIn: process.env.JWT_EXPIRE || '24h' }
+  );
+};
+
+// Send user response (without password)
+const sendUserResponse = (res, user, token = null) => {
+  const userObj = {
+    id: user._id || user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    fullName: `${user.firstName} ${user.lastName}`,
+    balance: user.balance || 0,
+    stats: user.stats || {
+      totalBets: 0,
+      wonBets: 0,
+      lostBets: 0,
+      pendingBets: 0,
+      totalWinnings: 0,
+      totalLosses: 0
+    },
+    isActive: user.isActive !== false
+  };
+
+  const response = {
+    success: true,
+    message: 'Operation successful',
+    user: userObj
+  };
+
+  if (token) {
+    response.token = token;
+  }
+
+  res.status(200).json(response);
+};
+
+// Helper function to find user in memory or MongoDB
+const findUserByEmail = async (email) => {
+  try {
+    // Try MongoDB first
+    if (User.findOne) {
+      return await User.findOne({ email });
+    }
+  } catch (error) {
+    console.log('MongoDB not available, using memory DB');
+  }
+  
+  // Fallback to memory database
+  return memoryDB.users.find(user => user.email === email);
+};
+
+// Helper function to compare password
+const comparePassword = async (inputPassword, userPassword) => {
+  try {
+    return await bcrypt.compare(inputPassword, userPassword);
+  } catch (error) {
+    // Simple comparison for demo (not secure)
+    return inputPassword === 'admin123' && userPassword.includes('admin123');
+  }
+};
 
 // Validation middleware
 const registerValidation = [
@@ -29,65 +98,24 @@ const registerValidation = [
 ];
 
 const loginValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email'),
-  body('password')
-    .notEmpty()
-    .withMessage('Password is required')
+  body('email').isEmail().withMessage('Please provide a valid email'),
+  body('password').notEmpty().withMessage('Password is required')
 ];
 
-// Helper function to generate JWT
-const generateToken = (userId) => {
-  return jwt.sign(
-    { userId: userId },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
-};
-
-// Helper function to send user response
-const sendUserResponse = (res, user, token = null) => {
-  const userResponse = {
-    id: user._id,
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    fullName: user.fullName,
-    avatar: user.avatar,
-    balance: user.balance,
-    stats: user.stats,
-    preferences: user.preferences,
-    winRate: user.winRate,
-    profitLoss: user.profitLoss,
-    isActive: user.isActive,
-    emailVerified: user.emailVerified,
-    lastLogin: user.lastLogin,
-    createdAt: user.createdAt
-  };
-
-  if (token) {
-    return res.status(200).json({
-      success: true,
-      message: 'Authentication successful',
-      token,
-      user: userResponse
-    });
-  }
-
-  return res.status(200).json({
-    success: true,
-    user: userResponse
-  });
-};
-
 // @route   POST /auth/register
-// @desc    Register a new user
+// @desc    Register new user
 // @access  Public
-router.post('/register', registerValidation, async (req, res) => {
+router.post('/register', [
+  body('firstName').trim().isLength({ min: 2, max: 50 }).withMessage('First name must be between 2-50 characters'),
+  body('lastName').trim().isLength({ min: 2, max: 50 }).withMessage('Last name must be between 2-50 characters'),
+  body('email').isEmail().withMessage('Please provide a valid email'),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number')
+], async (req, res) => {
   try {
-    // Check validation results
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -97,10 +125,10 @@ router.post('/register', registerValidation, async (req, res) => {
       });
     }
 
-    const { email, password, firstName, lastName } = req.body;
+    const { firstName, lastName, email, password } = req.body;
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await findUserByEmail(email);
     if (existingUser) {
       return res.status(409).json({
         success: false,
@@ -108,23 +136,50 @@ router.post('/register', registerValidation, async (req, res) => {
       });
     }
 
-    // Create new user
-    const user = new User({
-      email,
-      password,
-      firstName,
-      lastName,
-      lastLogin: new Date()
-    });
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    await user.save();
+    // Create user object
+    const userData = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      balance: 0,
+      stats: {
+        totalBets: 0,
+        wonBets: 0,
+        lostBets: 0,
+        pendingBets: 0,
+        totalWinnings: 0,
+        totalLosses: 0
+      },
+      isActive: true,
+      createdAt: new Date()
+    };
+
+    let user;
+    try {
+      // Try MongoDB first
+      if (User.create) {
+        user = await User.create(userData);
+      } else {
+        throw new Error('MongoDB not available');
+      }
+    } catch (error) {
+      // Use memory database
+      userData._id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      userData.id = userData._id;
+      memoryDB.users.push(userData);
+      user = userData;
+      console.log('✅ User created in memory database');
+    }
 
     // Generate JWT token
-    const token = generateToken(user._id);
+    const token = generateToken(user._id || user.id);
 
-    // Log the registration
-    console.log(`New user registered: ${email}`);
-
+    console.log(`✅ User registered: ${email}`);
     sendUserResponse(res, user, token);
   } catch (error) {
     console.error('Registration error:', error);
@@ -153,7 +208,7 @@ router.post('/login', loginValidation, async (req, res) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const user = await User.findOne({ email });
+    const user = await findUserByEmail(email);
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -162,7 +217,7 @@ router.post('/login', loginValidation, async (req, res) => {
     }
 
     // Check if account is active
-    if (!user.isActive) {
+    if (user.isActive === false) {
       return res.status(401).json({
         success: false,
         message: 'Account has been deactivated. Please contact support.'
@@ -170,7 +225,7 @@ router.post('/login', loginValidation, async (req, res) => {
     }
 
     // Check password
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await comparePassword(password, user.password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -178,15 +233,20 @@ router.post('/login', loginValidation, async (req, res) => {
       });
     }
 
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
+    // Update last login (only for MongoDB)
+    if (user.save) {
+      user.lastLogin = new Date();
+      await user.save();
+    } else {
+      // Update memory database
+      user.lastLogin = new Date();
+    }
 
     // Generate JWT token
-    const token = generateToken(user._id);
+    const token = generateToken(user._id || user.id);
 
     // Log the login
-    console.log(`User logged in: ${email}`);
+    console.log(`✅ User logged in: ${email}`);
 
     sendUserResponse(res, user, token);
   } catch (error) {
@@ -200,8 +260,8 @@ router.post('/login', loginValidation, async (req, res) => {
 
 // @route   POST /auth/logout
 // @desc    Logout user (client-side token removal)
-// @access  Private
-router.post('/logout', auth, (req, res) => {
+// @access  Public
+router.post('/logout', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Logout successful'
@@ -322,7 +382,7 @@ router.post('/change-password', auth, [
     }
 
     // Verify current password
-    const isMatch = await user.comparePassword(currentPassword);
+    const isMatch = await comparePassword(currentPassword, user.password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -331,7 +391,9 @@ router.post('/change-password', auth, [
     }
 
     // Update password
-    user.password = newPassword;
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    user.password = hashedPassword;
     await user.save();
 
     res.status(200).json({
@@ -437,6 +499,15 @@ router.post('/refresh-token', auth, async (req, res) => {
       message: 'Server error during token refresh'
     });
   }
+});
+
+// Health check
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Auth service is healthy',
+    memoryUsers: memoryDB.users.length
+  });
 });
 
 module.exports = router; 

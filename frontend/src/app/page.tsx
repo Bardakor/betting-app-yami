@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BetSlip } from '@/components/BetSlip';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -57,6 +58,42 @@ export default function Dashboard() {
     portfolio: 0
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  
+  // Bet Slip state
+  const [betSlipItems, setBetSlipItems] = useState<any[]>([]);
+  const [isBetSlipOpen, setIsBetSlipOpen] = useState(false);
+
+  // Add bet to slip
+  const addToBetSlip = (match: any, betType: string, selection: string, odds: number) => {
+    const betId = `${match.fixture.id}-${betType}-${selection}`;
+    
+    // Check if bet already exists
+    if (betSlipItems.find(item => item.id === betId)) {
+      return; // Already in bet slip
+    }
+
+    const newBet = {
+      id: betId,
+      fixtureId: match.fixture.id,
+      match: `${match.teams.home.name} vs ${match.teams.away.name}`,
+      betType,
+      selection,
+      odds,
+      homeTeam: match.teams.home.name,
+      awayTeam: match.teams.away.name
+    };
+
+    setBetSlipItems(prev => [...prev, newBet]);
+    setIsBetSlipOpen(true);
+  };
+
+  const removeFromBetSlip = (betId: string) => {
+    setBetSlipItems(prev => prev.filter(item => item.id !== betId));
+  };
+
+  const clearBetSlip = () => {
+    setBetSlipItems([]);
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -170,6 +207,17 @@ export default function Dashboard() {
             <Zap className="w-3 h-3 mr-1" />
             Real-time Odds
           </Badge>
+          
+          {/* Bet Slip Toggle Button */}
+          {betSlipItems.length > 0 && (
+            <Button
+              onClick={() => setIsBetSlipOpen(true)}
+              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold relative"
+            >
+              <DollarSign className="w-4 h-4 mr-2" />
+              Bet Slip ({betSlipItems.length})
+            </Button>
+          )}
         </div>
       </motion.div>
 
@@ -308,7 +356,8 @@ export default function Dashboard() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-gray-700/50 hover:bg-green-500/20 border-gray-600 text-center"
+                          className="bg-gray-700/50 hover:bg-green-500/20 border-gray-600 text-center transition-all duration-200 hover:scale-105"
+                          onClick={() => addToBetSlip(match, 'Match Winner', match.teams.home.name, parseFloat(match.odds?.homeWin || '2.10'))}
                         >
                           <div className="text-xs text-gray-400">1</div>
                           <div className="font-semibold text-white">{match.odds?.homeWin || '2.10'}</div>
@@ -316,7 +365,8 @@ export default function Dashboard() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-gray-700/50 hover:bg-yellow-500/20 border-gray-600 text-center"
+                          className="bg-gray-700/50 hover:bg-yellow-500/20 border-gray-600 text-center transition-all duration-200 hover:scale-105"
+                          onClick={() => addToBetSlip(match, 'Match Winner', 'Draw', parseFloat(match.odds?.draw || '3.20'))}
                         >
                           <div className="text-xs text-gray-400">X</div>
                           <div className="font-semibold text-white">{match.odds?.draw || '3.20'}</div>
@@ -324,7 +374,8 @@ export default function Dashboard() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-gray-700/50 hover:bg-red-500/20 border-gray-600 text-center"
+                          className="bg-gray-700/50 hover:bg-red-500/20 border-gray-600 text-center transition-all duration-200 hover:scale-105"
+                          onClick={() => addToBetSlip(match, 'Match Winner', match.teams.away.name, parseFloat(match.odds?.awayWin || '3.40'))}
                         >
                           <div className="text-xs text-gray-400">2</div>
                           <div className="font-semibold text-white">{match.odds?.awayWin || '3.40'}</div>
@@ -454,6 +505,15 @@ export default function Dashboard() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Bet Slip */}
+      <BetSlip
+        isOpen={isBetSlipOpen}
+        onClose={() => setIsBetSlipOpen(false)}
+        items={betSlipItems}
+        onRemoveItem={removeFromBetSlip}
+        onClearAll={clearBetSlip}
+      />
     </motion.div>
   );
 }

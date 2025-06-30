@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 require('dotenv').config();
 
-const connectDB = require('./config/database');
+const { connectDB } = require('./config/database');
 const passport = require('./config/passport');
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
@@ -17,6 +17,22 @@ const PORT = process.env.PORT || 3001;
 
 // Connect to database
 connectDB();
+
+// Auto-create admin user for demo
+setTimeout(async () => {
+  try {
+    const response = await fetch(`http://localhost:${PORT}/api/admin/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await response.json();
+    if (data.success) {
+      console.log('🔑 Admin user auto-created for demo');
+    }
+  } catch (error) {
+    // Admin might already exist, ignore error
+  }
+}, 2000); // Wait 2 seconds for server to be ready
 
 // Security middleware
 app.use(helmet());

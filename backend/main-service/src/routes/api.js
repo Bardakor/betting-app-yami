@@ -1,10 +1,13 @@
 const express = require('express');
 const axios = require('axios');
+const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { body, validationResult, query } = require('express-validator');
+const jwt = require('jsonwebtoken');
 
 const User = require('../models/User');
 const Bet = require('../models/Bet');
+const { memoryDB } = require('../config/database');
 const { auth, optionalAuth, checkBalance, bettingRateLimit, validateBetLimits } = require('../middleware/auth');
 
 const router = express.Router();
@@ -713,6 +716,475 @@ router.get('/health/external', async (req, res) => {
     services: results,
     timestamp: new Date().toISOString()
   });
+});
+
+// Verify JWT token (used by other microservices)
+router.get('/verify-token', async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId).select('-password');
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: user.fullName,
+        balance: user.balance,
+        isActive: user.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+});
+
+// Get user profile
+router.get('/user/profile', auth, async (req, res) => {
+  try {
+    let user;
+    
+    // Check if using MongoDB or in-memory database
+    if (mongoose.connection.readyState === 1) {
+      user = await User.findById(req.user.userId).select('-password');
+    } else {
+      // Use in-memory database
+      user = memoryDB.users.find(u => u.id === req.user.userId);
+    }
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id || user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: user.fullName || `${user.firstName} ${user.lastName}`,
+        avatar: user.avatar,
+        balance: user.balance,
+        stats: user.stats,
+        preferences: user.preferences,
+        winRate: user.winRate || (user.stats?.totalBets > 0 ? ((user.stats.wonBets / user.stats.totalBets) * 100).toFixed(2) : 0),
+        profitLoss: user.profitLoss || (user.stats ? user.stats.totalWinnings - user.stats.totalLosses : 0),
+        isActive: user.isActive,
+        emailVerified: user.emailVerified,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching profile'
+    });
+  }
+});
+
+// Update user balance
+router.post('/user/update-balance', auth, async (req, res) => {
+  try {
+    const { amount, operation } = req.body;
+
+    if (!amount || !operation || !['add', 'subtract'].includes(operation)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid amount and operation (add/subtract) are required'
+      });
+    }
+
+    let user;
+    
+    // Check if using MongoDB or in-memory database
+    if (mongoose.connection.readyState === 1) {
+      user = await User.findById(req.user.userId);
+    } else {
+      // Use in-memory database
+      user = memoryDB.users.find(u => u.id === req.user.userId);
+    }
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (operation === 'add') {
+      user.balance += parseFloat(amount);
+    } else {
+      if (user.balance < parseFloat(amount)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient balance'
+        });
+      }
+      user.balance -= parseFloat(amount);
+    }
+
+    // Save changes
+    if (mongoose.connection.readyState === 1) {
+      await user.save();
+    }
+    // In-memory changes are automatically saved since user is a reference
+
+    res.json({
+      success: true,
+      message: 'Balance updated successfully',
+      newBalance: user.balance
+    });
+  } catch (error) {
+    console.error('Update balance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating balance'
+    });
+  }
+});
+
+// Get user balance by ID (for services)
+router.get('/user/:userId/balance', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select('balance');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      balance: user.balance
+    });
+  } catch (error) {
+    console.error('Get user balance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching balance'
+    });
+  }
+});
+
+// Admin: Update any user's balance
+router.post('/admin/update-user-balance', auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const currentUser = await User.findById(req.user.userId);
+    if (!currentUser || currentUser.email !== 'admin@admin.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { userId, amount, operation } = req.body;
+
+    if (!userId || !amount || !operation || !['add', 'subtract'].includes(operation)) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID, valid amount, and operation (add/subtract) are required'
+      });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (operation === 'add') {
+      user.balance += parseFloat(amount);
+    } else {
+      if (user.balance < parseFloat(amount)) {
+        return res.status(400).json({
+          success: false,
+          message: 'User has insufficient balance'
+        });
+      }
+      user.balance -= parseFloat(amount);
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'User balance updated successfully',
+      newBalance: user.balance,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      }
+    });
+  } catch (error) {
+    console.error('Admin update balance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating balance'
+    });
+  }
+});
+
+// Admin: Get all users
+router.get('/admin/users', auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const currentUser = await User.findById(req.user.userId);
+    if (!currentUser || currentUser.email !== 'admin@admin.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { page = 1, limit = 20, search } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Build filter
+    const filter = {};
+    if (search) {
+      filter.$or = [
+        { email: { $regex: search, $options: 'i' } },
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Get users
+    const users = await User.find(filter)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Get total count
+    const total = await User.countDocuments(filter);
+
+    res.json({
+      success: true,
+      users: users.map(user => ({
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: `${user.firstName} ${user.lastName}`,
+        balance: user.balance,
+        stats: user.stats,
+        isActive: user.isActive,
+        emailVerified: user.emailVerified,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt
+      })),
+      pagination: {
+        current: parseInt(page),
+        total: Math.ceil(total / limit),
+        hasNext: skip + limit < total,
+        hasPrev: page > 1
+      }
+    });
+  } catch (error) {
+    console.error('Admin get users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching users'
+    });
+  }
+});
+
+// Update user profile
+router.put('/user/profile', auth, async (req, res) => {
+  try {
+    const { firstName, lastName, preferences } = req.body;
+
+    const updateData = {};
+    if (firstName) updateData.firstName = firstName;
+    if (lastName) updateData.lastName = lastName;
+    if (preferences) updateData.preferences = { ...preferences };
+
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: user.fullName,
+        preferences: user.preferences
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating profile'
+    });
+  }
+});
+
+// Get betting statistics
+router.get('/user/stats', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('stats balance');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      stats: {
+        balance: user.balance,
+        totalBets: user.stats.totalBets,
+        wonBets: user.stats.wonBets,
+        lostBets: user.stats.lostBets,
+        pendingBets: user.stats.pendingBets,
+        totalWinnings: user.stats.totalWinnings,
+        totalLosses: user.stats.totalLosses,
+        winRate: user.winRate,
+        profitLoss: user.profitLoss,
+        highestWin: user.stats.highestWin,
+        currentStreak: user.stats.currentStreak,
+        longestWinStreak: user.stats.longestWinStreak
+      }
+    });
+  } catch (error) {
+    console.error('Get stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching statistics'
+    });
+  }
+});
+
+// Create admin user if not exists
+router.post('/admin/create', async (req, res) => {
+  try {
+    // Check if admin already exists in memory or MongoDB
+    let existingAdmin;
+    try {
+      if (User.findOne) {
+        existingAdmin = await User.findOne({ email: 'admin@admin.com' });
+      }
+    } catch (error) {
+      // Check memory database
+      existingAdmin = memoryDB.users.find(user => user.email === 'admin@admin.com');
+    }
+
+    if (existingAdmin) {
+      return res.status(200).json({
+        success: true,
+        message: 'Admin user already exists',
+        credentials: {
+          email: 'admin@admin.com',
+          password: 'admin123'
+        }
+      });
+    }
+
+    // Create admin user
+    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const adminData = {
+      email: 'admin@admin.com',
+      password: hashedPassword,
+      firstName: 'Admin',
+      lastName: 'User',
+      balance: 100000, // Give admin a large balance
+      emailVerified: true,
+      isActive: true,
+      stats: {
+        totalBets: 0,
+        wonBets: 0,
+        lostBets: 0,
+        pendingBets: 0,
+        totalWinnings: 0,
+        totalLosses: 0
+      },
+      createdAt: new Date()
+    };
+
+    try {
+      // Try MongoDB first
+      if (User.create) {
+        await User.create(adminData);
+      } else {
+        throw new Error('MongoDB not available');
+      }
+    } catch (error) {
+      // Use memory database
+      adminData._id = 'admin123';
+      adminData.id = adminData._id;
+      memoryDB.users.push(adminData);
+      console.log('✅ Admin user created in memory database');
+    }
+
+    res.json({
+      success: true,
+      message: 'Admin user created successfully',
+      credentials: {
+        email: 'admin@admin.com',
+        password: 'admin123'
+      }
+    });
+  } catch (error) {
+    console.error('Create admin error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error creating admin user'
+    });
+  }
 });
 
 module.exports = router; 

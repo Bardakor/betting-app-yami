@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const { memoryDB } = require('../config/database');
 
 // Main authentication middleware
 const auth = async (req, res, next) => {
@@ -17,10 +19,18 @@ const auth = async (req, res, next) => {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
     
     // Get user from database
-    const user = await User.findById(decoded.userId);
+    let user;
+    
+    // Check if using MongoDB or in-memory database
+    if (mongoose.connection.readyState === 1) {
+      user = await User.findById(decoded.userId);
+    } else {
+      // Use in-memory database
+      user = memoryDB.users.find(u => u.id === decoded.userId);
+    }
     
     if (!user) {
       return res.status(401).json({
@@ -37,8 +47,8 @@ const auth = async (req, res, next) => {
     }
 
     // Add user info to request object
-    req.userId = user._id.toString();
-    req.user = user;
+    req.userId = user._id ? user._id.toString() : user.id;
+    req.user = { userId: req.userId, ...user };
     req.token = token;
 
     next();
@@ -75,12 +85,21 @@ const optionalAuth = async (req, res, next) => {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
+    
+    let user;
+    
+    // Check if using MongoDB or in-memory database
+    if (mongoose.connection.readyState === 1) {
+      user = await User.findById(decoded.userId);
+    } else {
+      // Use in-memory database
+      user = memoryDB.users.find(u => u.id === decoded.userId);
+    }
     
     if (user && user.isActive) {
-      req.userId = user._id.toString();
-      req.user = user;
+      req.userId = user._id ? user._id.toString() : user.id;
+      req.user = { userId: req.userId, ...user };
       req.token = token;
     }
 

@@ -16,12 +16,14 @@ import {
   Timer,
   Award,
   Info,
-  Shield
+  Shield,
+  DollarSign
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BetSlip } from '@/components/BetSlip';
 
 // Remove static data - will be fetched from API
 
@@ -127,6 +129,42 @@ export default function LiveMatches() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [groupedMatches, setGroupedMatches] = useState<Record<string, Competition>>({});
   const [selectedTab, setSelectedTab] = useState('live');
+  
+  // Bet Slip state
+  const [betSlipItems, setBetSlipItems] = useState<any[]>([]);
+  const [isBetSlipOpen, setIsBetSlipOpen] = useState(false);
+
+  // Add bet to slip
+  const addToBetSlip = (match: Match, betType: string, selection: string, odds: number) => {
+    const betId = `${match.fixture.id}-${betType}-${selection}`;
+    
+    // Check if bet already exists
+    if (betSlipItems.find(item => item.id === betId)) {
+      return; // Already in bet slip
+    }
+
+    const newBet = {
+      id: betId,
+      fixtureId: match.fixture.id,
+      match: `${match.teams.home.name} vs ${match.teams.away.name}`,
+      betType,
+      selection,
+      odds,
+      homeTeam: match.teams.home.name,
+      awayTeam: match.teams.away.name
+    };
+
+    setBetSlipItems(prev => [...prev, newBet]);
+    setIsBetSlipOpen(true);
+  };
+
+  const removeFromBetSlip = (betId: string) => {
+    setBetSlipItems(prev => prev.filter(item => item.id !== betId));
+  };
+
+  const clearBetSlip = () => {
+    setBetSlipItems([]);
+  };
 
   // Fetch live and upcoming matches
   useEffect(() => {
@@ -557,7 +595,8 @@ export default function LiveMatches() {
             <Button
               variant="outline"
               size="sm"
-              className="bg-gray-700/50 hover:bg-green-500/20 border-gray-600 flex flex-col p-3 h-auto"
+              className="bg-gray-700/50 hover:bg-green-500/20 border-gray-600 flex flex-col p-3 h-auto transition-all duration-200 hover:scale-105"
+              onClick={() => addToBetSlip(match, 'Match Winner', match.teams.home.name, match.calculatedOdds!.homeWin)}
             >
               <div className="text-xs text-gray-400 mb-1">HOME WIN</div>
               <div className="font-bold text-white text-lg">{match.calculatedOdds.homeWin}</div>
@@ -569,7 +608,8 @@ export default function LiveMatches() {
             <Button
               variant="outline"
               size="sm"
-              className="bg-gray-700/50 hover:bg-yellow-500/20 border-gray-600 flex flex-col p-3 h-auto"
+              className="bg-gray-700/50 hover:bg-yellow-500/20 border-gray-600 flex flex-col p-3 h-auto transition-all duration-200 hover:scale-105"
+              onClick={() => addToBetSlip(match, 'Match Winner', 'Draw', match.calculatedOdds!.draw)}
             >
               <div className="text-xs text-gray-400 mb-1">DRAW</div>
               <div className="font-bold text-white text-lg">{match.calculatedOdds.draw}</div>
@@ -581,7 +621,8 @@ export default function LiveMatches() {
             <Button
               variant="outline"
               size="sm"
-              className="bg-gray-700/50 hover:bg-red-500/20 border-gray-600 flex flex-col p-3 h-auto"
+              className="bg-gray-700/50 hover:bg-red-500/20 border-gray-600 flex flex-col p-3 h-auto transition-all duration-200 hover:scale-105"
+              onClick={() => addToBetSlip(match, 'Match Winner', match.teams.away.name, match.calculatedOdds!.awayWin)}
             >
               <div className="text-xs text-gray-400 mb-1">AWAY WIN</div>
               <div className="font-bold text-white text-lg">{match.calculatedOdds.awayWin}</div>
@@ -710,6 +751,17 @@ export default function LiveMatches() {
             <Trophy className="w-3 h-3 mr-1" />
             Competition Sorted
           </Badge>
+          
+          {/* Bet Slip Toggle Button */}
+          {betSlipItems.length > 0 && (
+            <Button
+              onClick={() => setIsBetSlipOpen(true)}
+              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold relative"
+            >
+              <DollarSign className="w-4 h-4 mr-2" />
+              Bet Slip ({betSlipItems.length})
+            </Button>
+          )}
         </div>
       </motion.div>
 
@@ -822,6 +874,15 @@ export default function LiveMatches() {
           </Card>
         </motion.div>
       )}
+
+      {/* Bet Slip */}
+      <BetSlip
+        isOpen={isBetSlipOpen}
+        onClose={() => setIsBetSlipOpen(false)}
+        items={betSlipItems}
+        onRemoveItem={removeFromBetSlip}
+        onClearAll={clearBetSlip}
+      />
     </motion.div>
   );
 } 
