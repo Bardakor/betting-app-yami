@@ -13,8 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { authService, User as AuthUser } from '@/lib/auth';
-import { LoginModal } from '@/components/LoginModal';
+import { authService } from '@/lib/auth';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -25,20 +25,17 @@ interface Notification {
 }
 
 export function Header() {
+  const { user, logout } = useAuth();
   const [notifications] = useState<Notification[]>([]);
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [balance, setBalance] = useState<number>(0);
   const [isDepositMode, setIsDepositMode] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
 
   useEffect(() => {
-    // Check if user is authenticated
-    if (authService.isAuthenticated()) {
-      setUser(authService.getUser());
+    if (user) {
       fetchBalance();
     }
-  }, []);
+  }, [user]);
 
   const fetchBalance = async () => {
     try {
@@ -51,14 +48,8 @@ export function Header() {
     }
   };
 
-  const handleLogin = () => {
-    setUser(authService.getUser());
-    fetchBalance();
-  };
-
   const handleLogout = () => {
-    authService.logout();
-    setUser(null);
+    logout();
     setBalance(0);
     toast.success('Logged out successfully');
   };
@@ -163,7 +154,7 @@ export function Header() {
             </div>
 
             {/* Admin Add Funds */}
-            {authService.isAdmin() && (
+            {user?.email === 'admin@admin.com' && (
               <Button
                 size="sm"
                 onClick={handleAddFunds}
@@ -224,69 +215,54 @@ export function Header() {
         </DropdownMenu>
 
         {/* User Menu */}
-        {user ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="p-1 hover:bg-gray-800">
-                <div className={`w-8 h-8 ${authService.isAdmin() ? 'bg-gradient-to-r from-red-500 to-orange-600' : 'bg-gradient-to-r from-blue-500 to-purple-600'} rounded-full flex items-center justify-center`}>
-                  <User className="w-4 h-4 text-white" />
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-gray-700">
-              <DropdownMenuLabel className="text-white">
-                <div>
-                  <p className="font-medium">{user.fullName}</p>
-                  <p className="text-sm text-gray-400">{authService.isAdmin() ? 'Administrator' : 'Member'}</p>
-                  <p className="text-xs text-yellow-400">${balance.toFixed(2)}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-gray-700" />
-              
-              <DropdownMenuItem className="text-gray-300 hover:bg-gray-800 hover:text-white">
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
-              </DropdownMenuItem>
-              
-              <DropdownMenuItem 
-                className="text-gray-300 hover:bg-gray-800 hover:text-white"
-                onClick={() => setIsDepositMode(true)}
-              >
-                <CreditCard className="mr-2 h-4 w-4" />
-                <span>Add Funds</span>
-              </DropdownMenuItem>
-              
-              <DropdownMenuItem className="text-gray-300 hover:bg-gray-800 hover:text-white">
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </DropdownMenuItem>
-              
-              <DropdownMenuSeparator className="bg-gray-700" />
-              
-              <DropdownMenuItem 
-                className="text-red-400 hover:bg-red-900/20 hover:text-red-300"
-                onClick={handleLogout}
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <Button
-            onClick={() => setShowLoginModal(true)}
-            className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
-          >
-            Login
-          </Button>
-        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="p-1 hover:bg-gray-800">
+              <div className={`w-8 h-8 ${user?.email === 'admin@admin.com' ? 'bg-gradient-to-r from-red-500 to-orange-600' : 'bg-gradient-to-r from-blue-500 to-purple-600'} rounded-full flex items-center justify-center`}>
+                <User className="w-4 h-4 text-white" />
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-gray-700">
+            <DropdownMenuLabel className="text-white">
+              <div>
+                <p className="font-medium">{user?.fullName}</p>
+                <p className="text-sm text-gray-400">{user?.email === 'admin@admin.com' ? 'Administrator' : 'Member'}</p>
+                <p className="text-xs text-yellow-400">${balance.toFixed(2)}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-gray-700" />
+            
+            <DropdownMenuItem className="text-gray-300 hover:bg-gray-800 hover:text-white">
+              <User className="mr-2 h-4 w-4" />
+              <span>Profile</span>
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              className="text-gray-300 hover:bg-gray-800 hover:text-white"
+              onClick={() => setIsDepositMode(true)}
+            >
+              <CreditCard className="mr-2 h-4 w-4" />
+              <span>Add Funds</span>
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem className="text-gray-300 hover:bg-gray-800 hover:text-white">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+            
+            <DropdownMenuSeparator className="bg-gray-700" />
+            
+            <DropdownMenuItem 
+              className="text-red-400 hover:bg-red-900/20 hover:text-red-300"
+              onClick={handleLogout}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onSuccess={handleLogin}
-      />
     </header>
   );
 } 

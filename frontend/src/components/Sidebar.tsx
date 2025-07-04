@@ -5,9 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   Home, 
-  Calculator, 
   Play, 
-  Trophy, 
   User, 
   Settings,
   BarChart3,
@@ -20,8 +18,6 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Live Matches', href: '/live-matches', icon: Play },
-  { name: 'Calculator', href: '/calculator', icon: Calculator },
-  { name: 'Leaderboards', href: '/leaderboards', icon: Trophy },
   { name: 'Profile', href: '/profile', icon: User },
 ];
 
@@ -44,7 +40,7 @@ export function Sidebar() {
       <div className="h-16 flex items-center justify-between px-4 border-b border-gray-800">
         {!isCollapsed && (
           <div>
-            <h1 className="text-xl font-bold text-white">Elite Betting</h1>
+            <h1 className="text-xl font-bold text-white">Yami Betting</h1>
             <p className="text-xs text-gray-400">Professional Hub</p>
           </div>
         )}

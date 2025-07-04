@@ -6,10 +6,8 @@ import {
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
-  Target, 
   Activity,
   Clock,
-  Trophy,
   BarChart3,
   Zap,
   Eye,
@@ -240,7 +238,7 @@ export default function Dashboard() {
         <Card className="bg-gray-900 border border-gray-800 rounded-lg p-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-blue-400">Win Rate</CardTitle>
-            <Target className="h-4 w-4 text-blue-400" />
+            <TrendingUp className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{stats.winRate}%</div>
@@ -446,17 +444,9 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-semibold">
-                <Target className="w-4 h-4 mr-2" />
-                Calculate Odds
-              </Button>
               <Button variant="outline" className="w-full border-gray-700">
                 <Eye className="w-4 h-4 mr-2" />
                 Live Matches
-              </Button>
-              <Button variant="outline" className="w-full border-gray-700">
-                <Trophy className="w-4 h-4 mr-2" />
-                Leaderboard
               </Button>
             </CardContent>
           </Card>

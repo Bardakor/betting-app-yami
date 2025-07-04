@@ -26,13 +26,14 @@ const connectDB = async () => {
       memoryDB.users = [
         {
           _id: 'admin123',
+          id: 'admin123',
           email: 'admin@admin.com',
-          password: '$2b$10$rGk5D8oOAc8zR6YU4QXfgOH.RjY2mR8vCyJx8s9Uq0.WzR7Nv8Zre', // admin123
+          password: '$2a$10$sGGOxuZHpMnE8DA97AvwnuRX0fqTFBAXYkeRQ1b/AAeyswRZf/d1G', // admin123
           firstName: 'Admin',
           lastName: 'User',
           role: 'admin',
           isActive: true,
-          balance: 1000,
+          balance: 100000,
           stats: {
             totalBets: 0,
             wonBets: 0,

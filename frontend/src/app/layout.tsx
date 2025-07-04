@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
-import { Header } from "@/components/Header";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedLayout } from "@/components/ProtectedLayout";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Elite Betting - Professional Hub",
+  title: "Yami Betting - Professional Hub",
   description: "Advanced football betting platform with real-time odds and analytics",
 };
 
@@ -27,15 +28,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${geistSans.variable} ${geistMono.variable} bg-black text-white antialiased`}>
-        <div className="flex h-screen">
-          <Sidebar />
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <Header />
-            <main className="flex-1 overflow-y-auto bg-black p-6">
-              {children}
-            </main>
-          </div>
-        </div>
+        <AuthProvider>
+          <ProtectedLayout>
+            {children}
+          </ProtectedLayout>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

@@ -107,7 +107,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
       <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-center">
-            Welcome to Elite Betting
+            Welcome to Yami Betting
           </DialogTitle>
           <DialogDescription className="text-gray-400 text-center">
             Sign in to your account or create a new one

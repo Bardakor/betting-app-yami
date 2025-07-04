@@ -137,7 +137,7 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}🌐 Elite Betting Platform Started!${NC}"
+echo -e "${GREEN}🌐 Yami Betting Platform Started!${NC}"
 echo -e "${YELLOW}Frontend: http://localhost:3000${NC}"
 echo ""
 echo -e "${GREEN}🔧 Backend Services:${NC}"

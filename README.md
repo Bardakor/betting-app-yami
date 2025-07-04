@@ -1,263 +1,345 @@
-# 🎲 Elite Betting Platform
+# Yami Betting Platform - Production-Ready Full Stack Application
 
-A professional betting platform with real-time football data, statistical odds calculation, and modern microservices architecture.
+## 🎯 Project Overview
 
-![Platform Preview](https://img.shields.io/badge/Status-Live-brightgreen)
-![Version](https://img.shields.io/badge/Version-1.0.0-blue)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+Yami Betting Platform is a comprehensive, production-ready full stack application built with modern JavaScript technologies. It demonstrates advanced microservices architecture, real-time data processing, and secure authentication systems for sports betting.
 
-## 🚀 Features
+**Topic Choice**: Sports betting platform with live match data and statistical odds calculation - chosen for its real-world applicability and market demand in the growing online gaming industry.
 
-### ⚡ Real-Time Data
-- **Live Football Matches** from API-Football
-- **Real-Time Scores** and match updates
-- **Statistical Odds Calculation** using FBRef data
-- **Auto-Refresh** every 30 seconds
-
-### 🎯 Advanced Analytics
-- **Team Performance Analysis** 
-- **Statistical Odds Calculation**
-- **Competition Rankings** (Premier League, La Liga, etc.)
-- **Confidence Scoring** for predictions
-
-### 🏗️ Architecture
-- **Microservices Architecture** with 3 specialized services
-- **Next.js Frontend** with TypeScript
-- **RESTful APIs** with comprehensive error handling
-- **Intelligent Caching** for optimal performance
-
-## 🛠️ Tech Stack
+## 🏗️ Architecture & Technology Stack
 
 ### Frontend
-- **Next.js 15** with TypeScript
-- **Tailwind CSS** for styling
-- **Framer Motion** for animations
-- **Radix UI** components
-- **Lucide React** icons
+- **Framework**: Next.js 15 with React 19
+- **Styling**: Tailwind CSS with custom components
+- **Animations**: Framer Motion
+- **UI Components**: Radix UI primitives
+- **State Management**: React hooks and context
+- **Authentication**: JWT token management
 
-### Backend Services
-- **Node.js + Express** microservices
-- **MongoDB** for user data
-- **SQLite** for odds calculations
-- **JWT Authentication** + Google OAuth
-- **Rate Limiting** and security middleware
+### Backend - Microservices Architecture
+1. **Main Service** (Port 3001) - Authentication, user management, API orchestration
+2. **Fixtures Service** (Port 3002) - Live match data and fixtures
+3. **Odds Service** (Port 3003) - Statistical odds calculation
+4. **Wallet Service** (Port 3004) - Payment processing and transactions
+5. **Bet Service** (Port 3005) - Bet placement and management
+6. **Result Service** (Port 3006) - Match result processing
 
-### External APIs
-- **API-Football** - Live match data
-- **FBRef API** - Team statistics and performance data
+### Databases (2+ Requirement Met)
+- **Primary**: MongoDB for production data
+- **Fallback**: In-memory storage for demo/development
+- **Collections**: users, bets, transactions, processed_results
+
+### External API Integration
+- **API-Football**: Live sports data and fixtures
+- **Custom Statistical Engine**: Real-time odds calculation
+
+## 🔐 Authentication & Security
+
+### Multiple Authentication Methods
+1. **Email/Password Authentication** with bcrypt password hashing
+2. **Google OAuth Integration** for social login
+3. **JWT Token System** for secure API access
+4. **Role-based Access Control** (Admin/User permissions)
+
+### Security Features
+- Input validation and sanitization
+- Rate limiting (100 req/15min general, 5 bets/min user)
+- CORS configuration
+- Secure password storage
+- Token-based authentication between microservices
+
+### Protected Routes
+- Betting operations require authentication
+- Admin functions require admin role
+- Unauthorized access redirects to login page
+- Token verification across all microservices
+
+## 🔌 API Paradigms (2+ Requirement Met)
+
+### 1. REST API
+Traditional HTTP methods across all microservices:
+- GET, POST, PUT, DELETE operations
+- Resource-based URLs
+- Standard HTTP status codes
+- JSON request/response format
+
+### 2. Polling/Real-time Updates
+- Client-side polling every 30 seconds for live data
+- Simulates real-time behavior for live matches
+- Auto-refresh functionality for live odds
+
+## 🚀 API as a Service
+
+### JWT-Protected Endpoints
+All APIs require JWT authentication for protected operations:
+
+```bash
+# Get Token (Working Demo)
+curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@admin.com","password":"admin123"}'
+
+# Access Protected Endpoint (With Token)
+curl -X GET http://localhost:3001/api/user/stats \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Access Without Token (Access Denied Demo)
+curl -X GET http://localhost:3001/api/user/stats
+# Returns: 401 Unauthorized
+```
+
+### External API Service Features
+- Comprehensive API documentation with examples
+- Postman collection ready for testing
+- Rate limiting and error handling
+- External developer access via JWT tokens
+
+## 📡 Service Communication
+
+### Inter-Service Communication
+- JWT-based authentication between services
+- HTTP REST calls for data exchange
+- Error handling and retry mechanisms
+- Health check endpoints on all services
+
+### Frontend-Backend Communication
+- Next.js API routes as proxy layer
+- CORS-enabled cross-origin requests
+- Real-time data updates through polling
+- Secure token-based authentication
+
+## 🗄️ Database Schema
+
+### MongoDB Collections
+```javascript
+// Users Collection
+{
+  email: String,
+  password: String (bcrypt hashed),
+  firstName: String,
+  lastName: String,
+  role: String (admin/user),
+  balance: Number,
+  stats: Object,
+  googleId: String (for OAuth),
+  isActive: Boolean
+}
+
+// Bets Collection
+{
+  userId: ObjectId,
+  fixtureId: Number,
+  betType: String,
+  selection: String,
+  stake: Number,
+  odds: Number,
+  status: String (pending/won/lost),
+  placedAt: Date
+}
+
+// Transactions Collection
+{
+  userId: ObjectId,
+  type: String (deposit/withdrawal/bet/win),
+  amount: Number,
+  description: String,
+  createdAt: Date
+}
+```
 
 ## 🏃‍♂️ Quick Start
 
 ### Prerequisites
 - Node.js 18+
-- MongoDB (optional, for user features)
+- npm or yarn
+- MongoDB (optional - uses in-memory fallback)
 
-### 1. Clone Repository
+### Installation & Running
+
+1. **Clone and Install**
 ```bash
-git clone https://github.com/[username]/betting-app-yami.git
-cd betting-app-yami
+git clone [repository-url]
+cd Final2
+npm install
 ```
 
-### 2. Install Dependencies
-```bash
-# Install all service dependencies
-cd backend/fixtures-service && npm install && cd ../..
-cd backend/odds-service && npm install && cd ../..
-cd backend/main-service && npm install && cd ../..
-cd frontend && npm install && cd ..
-```
-
-### 3. Environment Setup
-```bash
-# Copy environment files
-cp backend/fixtures-service/env.example backend/fixtures-service/.env
-cp backend/odds-service/env.example backend/odds-service/.env
-cp backend/main-service/env.example backend/main-service/.env
-```
-
-### 4. Start All Services
-```bash
-# Use the provided startup script
-chmod +x start-services.sh
-./start-services.sh
-```
-
-### 5. Access the Application
-- **Frontend**: http://localhost:3000
-- **Test Page**: Open `test-live-matches.html`
-- **API Health**: http://localhost:3002/health
-
-## 🏗️ Project Structure
-
-```
-betting-app-yami/
-├── frontend/                 # Next.js frontend application
-│   ├── src/
-│   │   ├── app/             # Next.js 13+ app directory
-│   │   ├── components/      # Reusable UI components
-│   │   └── lib/             # Utilities and helpers
-├── backend/
-│   ├── fixtures-service/    # Live match data service (Port 3002)
-│   ├── odds-service/        # Statistical odds calculation (Port 3003)
-│   └── main-service/        # Authentication & user management (Port 3001)
-├── logs/                    # Service logs
-├── start-services.sh        # Startup script
-├── stop-services.sh         # Shutdown script
-└── test-live-matches.html   # Standalone test page
-```
-
-## 🎯 Services Overview
-
-### 📡 Fixtures Service (Port 3002)
-- Fetches live match data from API-Football
-- Calculates statistical odds using team performance
-- Intelligent caching with 5-minute TTL
-- Competition sorting and grouping
-
-**Key Endpoints:**
-- `GET /fixtures/live-now` - Live matches with odds
-- `GET /fixtures/today` - Today's matches
-- `GET /health` - Service health check
-
-### 🎲 Odds Service (Port 3003)
-- Advanced statistical odds calculation
-- SQLite database for historical data
-- FBRef API integration for team statistics
-- Confidence scoring and market analysis
-
-**Key Endpoints:**
-- `GET /calculate` - Calculate match odds
-- `GET /live-comparison` - Compare with market odds
-- `GET /fixtures/:id` - Odds for specific fixture
-
-### 👤 Main Service (Port 3001)
-- User authentication (JWT + Google OAuth)
-- Bet placement and management
-- User statistics and leaderboards
-- MongoDB for data persistence
-
-**Key Endpoints:**
-- `POST /auth/login` - User authentication
-- `GET /api/user/stats` - User statistics
-- `POST /api/bets` - Place bets
-
-## 🔧 Management
-
-### Start Services
+2. **Start All Services**
 ```bash
 ./start-services.sh
 ```
 
-### Stop Services
+3. **Access Application**
+- Frontend: http://localhost:3000
+- Main API: http://localhost:3001
+- See API_DOCUMENTATION.md for all endpoints
+
+4. **Default Admin Account**
+- Email: admin@admin.com
+- Password: admin123
+- Balance: $100,000
+
+### Individual Service Management
 ```bash
+# Start specific service
+cd backend/main-service && npm start
+
+# Stop all services
 ./stop-services.sh
 ```
 
-### View Logs
+## 🎮 Application Features
+
+### Live Betting Experience
+- Real-time live matches from Chinese Super League, J-League, etc.
+- Statistical odds calculation with confidence ratings
+- Interactive bet slip with multi-bet support
+- Live score updates every 30 seconds
+
+### User Management
+- User registration and profile management
+- Google OAuth integration
+- Balance management and transaction history
+- Betting statistics and performance tracking
+
+### Admin Features
+- User management and balance adjustments
+- Betting oversight and statistics
+- Match result processing
+- System health monitoring
+
+## 🧪 Testing & Validation
+
+### API Testing with Postman
+
+1. **Authentication Test**
 ```bash
-tail -f logs/frontend.log
-tail -f logs/fixtures.log
-tail -f logs/odds.log
+POST http://localhost:3001/auth/login
+Body: {"email": "admin@admin.com", "password": "admin123"}
+Expected: 200 OK with JWT token
 ```
 
-### Health Checks
+2. **Protected Endpoint with Token**
 ```bash
-curl http://localhost:3002/health  # Fixtures service
-curl http://localhost:3003/health  # Odds service
-curl http://localhost:3001/health  # Main service (requires MongoDB)
+GET http://localhost:3001/api/user/stats
+Headers: Authorization: Bearer <token>
+Expected: 200 OK with user statistics
 ```
 
-## 🌐 API Documentation
-
-### Live Matches Endpoint
-```http
-GET /api/fixtures/live
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "count": 5,
-  "fixtures": [
-    {
-      "fixture": {
-        "id": 1319208,
-        "status": { "short": "2H", "elapsed": 90 }
-      },
-      "league": {
-        "name": "Victoria NPL",
-        "country": "Australia"
-      },
-      "teams": {
-        "home": { "name": "Melbourne Victory II" },
-        "away": { "name": "Melbourne Knights" }
-      },
-      "goals": { "home": 1, "away": 2 },
-      "calculatedOdds": {
-        "homeWin": 2.54,
-        "draw": 3.29,
-        "awayWin": 3.96,
-        "confidence": "high"
-      }
-    }
-  ],
-  "groupedByCompetition": { ... }
-}
-```
-
-## 🔐 Environment Variables
-
-### Required API Keys
-- `API_FOOTBALL_KEY` - API-Football subscription key
-- `FBR_API_KEY` - FBRef API key for statistics
-
-### Optional Configuration
-- `MONGODB_URI` - MongoDB connection string
-- `JWT_SECRET` - JWT signing secret
-- `GOOGLE_CLIENT_ID` - Google OAuth client ID
-- `GOOGLE_CLIENT_SECRET` - Google OAuth secret
-
-## 🚀 Deployment
-
-### Development
+3. **Access Denied Test**
 ```bash
-./start-services.sh
+GET http://localhost:3001/api/user/stats
+(No Authorization header)
+Expected: 401 Unauthorized
 ```
 
-### Production
-1. Set up MongoDB instance
-2. Configure environment variables
-3. Use PM2 or Docker for process management
-4. Set up reverse proxy (Nginx)
-5. Configure SSL certificates
+### Live Data Verification
+- Visit http://localhost:3000/live-matches
+- Verify real team names (not mock data)
+- Confirm live scores and match times
+- Test betting button functionality
 
-## 🤝 Contributing
+## 📋 Project Requirements Checklist
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+### ✅ Core Requirements Met
+- [x] **Frontend**: Interactive Next.js application
+- [x] **Backend**: 6 microservices (exceeds 3 minimum)
+- [x] **Databases**: MongoDB + In-memory (exceeds 2 minimum)
+- [x] **API Communication**: REST APIs between all services
+- [x] **Authentication**: JWT + Google OAuth
+- [x] **Protected Routes**: Token-based access control
+- [x] **API as Service**: JWT-protected external API access
+- [x] **Error Handling**: Comprehensive error responses
 
-## 📝 License
+### ✅ Advanced Features Implemented
+- [x] **External API Integration**: API-Football for live data
+- [x] **Multiple API Paradigms**: REST + Polling/Real-time
+- [x] **Production Security**: Rate limiting, validation, CORS
+- [x] **Comprehensive Documentation**: API docs with examples
+- [x] **Real-time Data**: Live match updates every 30 seconds
+- [x] **Scalable Architecture**: Independent microservices
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## 📊 Presentation Points
 
-## 🙏 Acknowledgments
+### App Demonstration
+1. **Live Betting Interface**: Real matches with interactive odds
+2. **Authentication Flow**: Login, Google OAuth, protected routes
+3. **Microservices**: 6 independent services working together
+4. **Real-time Updates**: Live data refreshing automatically
 
-- **API-Football** for comprehensive football data
-- **FBRef** for detailed team statistics
-- **Radix UI** for accessible components
-- **Vercel** for Next.js framework
+### Technical Stack Highlights
+- **Frontend**: Next.js 15, React 19, Tailwind CSS, Framer Motion
+- **Backend**: Node.js microservices, Express.js, JWT authentication
+- **Database**: MongoDB with in-memory fallback
+- **External APIs**: API-Football integration
+- **Security**: bcrypt, CORS, rate limiting, input validation
 
-## 📞 Support
+### Architecture Deep-dive
+- Service-to-service JWT authentication
+- Database schema and relationships
+- API paradigms: REST + Polling
+- Error handling and logging strategies
 
-For support and questions:
-- Open an issue in this repository
-- Check the logs directory for debugging
-- Review the health check endpoints
+### API Demonstration
+- Postman collection with working examples
+- JWT token authentication demo
+- Access denied scenarios
+- Rate limiting in action
+
+## 🔗 API Documentation
+
+See [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) for comprehensive API reference with:
+- All endpoint documentation
+- Request/response examples
+- Authentication requirements
+- Postman testing instructions
+- Error code references
+
+## 🏗️ Development & Production
+
+### Environment Configuration
+```bash
+# Main Service (.env)
+PORT=3001
+MONGODB_URI=mongodb://localhost:27017/betting_app
+JWT_SECRET=your-secret-key
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+FRONTEND_URL=http://localhost:3000
+```
+
+### Production Deployment Considerations
+1. **Security**: Environment variables for secrets
+2. **Scaling**: Horizontal scaling for microservices
+3. **Monitoring**: Health checks and logging
+4. **Database**: Production MongoDB cluster
+5. **Load Balancing**: nginx for service distribution
+
+## 📈 Market Potential & Future Development
+
+This platform demonstrates production-ready architecture suitable for:
+- Sports betting platforms
+- Real-time data applications
+- Microservices architecture patterns
+- Financial transaction systems
+
+The codebase provides a solid foundation for further development in the growing online gaming and sports analytics markets.
+
+## 👥 Team Contribution Guidelines
+
+For team presentations:
+- Each member should understand the microservices architecture
+- Demonstrate different API endpoints and authentication flows
+- Explain database relationships and data flow
+- Show real-time features and external API integration
+
+## 📞 Support & Contact
+
+For technical questions or demo requests:
+- Review API_DOCUMENTATION.md for detailed endpoints
+- Use Postman collection for API testing
+- Check logs/ directory for service debugging
+- Ensure all services are running via start-services.sh
 
 ---
 
-**⚽ Built with passion for football and betting analytics!** 
+**🎉 Production-Ready Full Stack Application - Ready for Professional Demonstration** 

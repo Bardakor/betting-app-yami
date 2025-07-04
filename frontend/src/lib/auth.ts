@@ -135,6 +135,23 @@ class AuthService {
     }
   }
 
+  async setTokenAndFetchUser(token: string): Promise<void> {
+    this.token = token;
+    localStorage.setItem('auth_token', token);
+    
+    try {
+      // Decode the token to get basic user info
+      const decoded: any = jwtDecode(token);
+      
+      // Fetch full user profile
+      await this.refreshUserData();
+    } catch (error) {
+      console.error('Token processing error:', error);
+      this.logout();
+      throw error;
+    }
+  }
+
   logout(): void {
     this.token = null;
     this.user = null;

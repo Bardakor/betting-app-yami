@@ -209,6 +209,13 @@ router.post('/login', loginValidation, async (req, res) => {
 
     // Find user by email
     const user = await findUserByEmail(email);
+    console.log('Login attempt for:', email);
+    console.log('User found:', user ? 'YES' : 'NO');
+    if (user) {
+      console.log('User ID:', user._id || user.id);
+      console.log('User active:', user.isActive);
+    }
+    
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -225,7 +232,13 @@ router.post('/login', loginValidation, async (req, res) => {
     }
 
     // Check password
+    console.log('Comparing password for user:', email);
+    console.log('Input password:', password);
+    console.log('Stored password hash:', user.password);
+    
     const isMatch = await comparePassword(password, user.password);
+    console.log('Password match result:', isMatch);
+    
     if (!isMatch) {
       return res.status(401).json({
         success: false,
