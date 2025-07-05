@@ -258,6 +258,15 @@ router.post('/google/callback', async (req, res) => {
     res.json(formatUserResponse(user, token));
   } catch (error) {
     console.error('❌ Google OAuth error:', error.response?.data || error.message);
+    
+    // Handle specific OAuth errors
+    if (error.response?.data?.error === 'invalid_grant') {
+      return res.status(400).json({
+        success: false,
+        message: 'OAuth authorization code has expired or been used. Please try logging in again.'
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Google authentication failed'
@@ -283,12 +292,15 @@ router.get('/profile', (req, res) => {
     const user = users.find(u => u.id === decoded.userId);
     
     if (!user) {
+      console.log('❌ User not found for token, userId:', decoded.userId);
+      console.log('📋 Available users:', users.map(u => ({ id: u.id, email: u.email })));
       return res.status(401).json({
         success: false,
         message: 'User not found'
       });
     }
 
+    console.log('✅ Profile retrieved for user:', user.email);
     res.json({
       success: true,
       user: {

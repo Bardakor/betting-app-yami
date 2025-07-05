@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -9,9 +9,15 @@ export default function AuthCallback() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setTokenAndRefresh } = useAuth();
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple executions
+    if (hasProcessed.current) return;
+    
     const handleCallback = async () => {
+      hasProcessed.current = true;
+      
       const code = searchParams.get('code');
       const error = searchParams.get('error');
       const state = searchParams.get('state');
@@ -81,7 +87,7 @@ export default function AuthCallback() {
     };
 
     handleCallback();
-  }, [searchParams, router, setTokenAndRefresh]);
+  }, []); // Empty dependency array to run only once
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
