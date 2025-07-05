@@ -28,7 +28,16 @@ const verifyToken = async (req, res, next) => {
       });
     }
 
-    req.user = response.data.user;
+    // Get user details from profile endpoint
+    const profileResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/auth/profile`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (profileResponse.data.success) {
+      req.user = profileResponse.data.user;
+    } else {
+      req.user = { id: response.data.userId };
+    }
     next();
   } catch (error) {
     console.error('Token verification error:', error);
@@ -43,7 +52,7 @@ const verifyToken = async (req, res, next) => {
 router.get('/balance', verifyToken, async (req, res) => {
   try {
     // Get balance from main service
-    const response = await axios.get(`${process.env.MAIN_SERVICE_URL}/api/user/profile`, {
+    const response = await axios.get(`${process.env.MAIN_SERVICE_URL}/auth/profile`, {
       headers: { Authorization: req.header('Authorization') }
     });
 
@@ -89,7 +98,7 @@ router.post('/deposit', verifyToken, async (req, res) => {
     }
 
     // Update balance in main service
-    const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/api/user/update-balance`, {
+    const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/update-balance`, {
       amount: amount,
       operation: 'add'
     }, {
@@ -151,7 +160,7 @@ router.post('/withdraw', verifyToken, async (req, res) => {
     }
 
     // Get current balance
-    const balanceResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/api/user/profile`, {
+    const balanceResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/auth/profile`, {
       headers: { Authorization: req.header('Authorization') }
     });
 
@@ -179,7 +188,7 @@ router.post('/withdraw', verifyToken, async (req, res) => {
     }
 
     // Update balance in main service
-    const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/api/user/update-balance`, {
+    const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/update-balance`, {
       amount: amount,
       operation: 'subtract'
     }, {
@@ -298,7 +307,7 @@ router.post('/admin/add-funds', verifyToken, async (req, res) => {
     }
 
     // Update balance in main service
-    const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/api/admin/update-user-balance`, {
+    const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
       userId,
       amount,
       operation: 'add'
@@ -361,7 +370,7 @@ router.post('/process-bet', async (req, res) => {
 
     // For bet placement, check balance first
     if (type === 'bet_placed') {
-      const balanceResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/api/user/${userId}/balance`);
+      const balanceResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/auth/user/${userId}/balance`);
       
       if (!balanceResponse.data.success || balanceResponse.data.balance < amount) {
         return res.status(400).json({
@@ -371,7 +380,7 @@ router.post('/process-bet', async (req, res) => {
       }
 
       // Deduct amount
-      const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/api/admin/update-user-balance`, {
+      const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
         userId,
         amount,
         operation: 'subtract'
@@ -405,7 +414,7 @@ router.post('/process-bet', async (req, res) => {
 
     // For bet wins/losses
     if (type === 'bet_won') {
-      const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/api/admin/update-user-balance`, {
+      const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
         userId,
         amount,
         operation: 'add'

@@ -116,7 +116,7 @@ class AuthService {
     if (!this.token) return;
 
     try {
-      const response = await fetch('http://localhost:3001/api/user/profile', {
+      const response = await fetch('http://localhost:3001/auth/profile', {
         headers: {
           Authorization: `Bearer ${this.token}`,
         },

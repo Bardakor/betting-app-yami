@@ -2,34 +2,14 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const { users } = require('../config/shared-users');
 const router = express.Router();
-
-// Simple memory database for demo
-const users = [
-  {
-    id: 'admin123',
-    email: 'admin@admin.com',
-    password: 'admin123', // Plain text for demo simplicity
-    firstName: 'Admin',
-    lastName: 'User',
-    balance: 100000,
-    isActive: true,
-    stats: {
-      totalBets: 0,
-      wonBets: 0,
-      lostBets: 0,
-      pendingBets: 0,
-      totalWinnings: 0,
-      totalLosses: 0
-    }
-  }
-];
 
 // JWT token generation
 const generateToken = (userId) => {
   return jwt.sign(
     { userId },
-    process.env.JWT_SECRET || 'elite-betting-super-secret-jwt-key-2024-production',
+    process.env.JWT_SECRET || 'your-fallback-secret',
     { expiresIn: '24h' }
   );
 };
@@ -182,7 +162,7 @@ router.get('/verify-token', (req, res) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'elite-betting-super-secret-jwt-key-2024-production');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
     res.status(200).json({
       success: true,
       userId: decoded.userId,
@@ -281,6 +261,214 @@ router.post('/google/callback', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Google authentication failed'
+    });
+  }
+});
+
+// @route   GET /auth/profile  
+// @desc    Get user profile
+// @access  Private
+router.get('/profile', (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
+    const user = users.find(u => u.id === decoded.userId);
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: `${user.firstName} ${user.lastName}`,
+        balance: user.balance,
+        stats: user.stats,
+        isActive: user.isActive,
+        avatar: user.avatar,
+        googleId: user.googleId
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get profile error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+});
+
+// @route   POST /auth/update-balance
+// @desc    Update user balance
+// @access  Private
+router.post('/update-balance', (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
+    const user = users.find(u => u.id === decoded.userId);
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const { amount, operation } = req.body;
+
+    if (!amount || !operation || !['add', 'subtract'].includes(operation)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid amount and operation (add/subtract) are required'
+      });
+    }
+
+    if (operation === 'add') {
+      user.balance += parseFloat(amount);
+    } else {
+      if (user.balance < parseFloat(amount)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient balance'
+        });
+      }
+      user.balance -= parseFloat(amount);
+    }
+
+    res.json({
+      success: true,
+      message: 'Balance updated successfully',
+      newBalance: user.balance
+    });
+  } catch (error) {
+    console.error('❌ Update balance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating balance'
+    });
+  }
+});
+
+// @route   POST /auth/admin/update-user-balance
+// @desc    Admin update any user's balance
+// @access  Private (Admin only)
+router.post('/admin/update-user-balance', (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
+    const adminUser = users.find(u => u.id === decoded.userId);
+    
+    if (!adminUser || adminUser.email !== 'admin@admin.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { userId, amount, operation } = req.body;
+
+    if (!userId || !amount || !operation || !['add', 'subtract'].includes(operation)) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID, valid amount, and operation (add/subtract) are required'
+      });
+    }
+
+    const user = users.find(u => u.id === userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (operation === 'add') {
+      user.balance += parseFloat(amount);
+    } else {
+      if (user.balance < parseFloat(amount)) {
+        return res.status(400).json({
+          success: false,
+          message: 'User has insufficient balance'
+        });
+      }
+      user.balance -= parseFloat(amount);
+    }
+
+    res.json({
+      success: true,
+      message: 'User balance updated successfully',
+      newBalance: user.balance,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      }
+    });
+  } catch (error) {
+    console.error('❌ Admin update balance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating balance'
+    });
+  }
+});
+
+// @route   GET /auth/user/:userId/balance
+// @desc    Get user balance by ID (for services)
+// @access  Public (internal service calls)
+router.get('/user/:userId/balance', (req, res) => {
+  try {
+    const user = users.find(u => u.id === req.params.userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      balance: user.balance
+    });
+  } catch (error) {
+    console.error('❌ Get user balance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching balance'
     });
   }
 });

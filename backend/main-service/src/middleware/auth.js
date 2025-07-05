@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const { memoryDB } = require('../config/database');
+const { users } = require('../config/shared-users');
 
 // Main authentication middleware
 const auth = async (req, res, next) => {
@@ -28,8 +29,9 @@ const auth = async (req, res, next) => {
     if (mongoose.connection.readyState === 1) {
       user = await User.findById(decoded.userId);
     } else {
-      // Use in-memory database
-      user = memoryDB.users.find(u => u.id === decoded.userId);
+      // Try shared users first (from auth-simple), then fallback to memoryDB
+      user = users.find(u => u.id === decoded.userId) || 
+             memoryDB.users.find(u => u.id === decoded.userId);
     }
     
     if (!user) {
@@ -93,8 +95,9 @@ const optionalAuth = async (req, res, next) => {
     if (mongoose.connection.readyState === 1) {
       user = await User.findById(decoded.userId);
     } else {
-      // Use in-memory database
-      user = memoryDB.users.find(u => u.id === decoded.userId);
+      // Try shared users first (from auth-simple), then fallback to memoryDB
+      user = users.find(u => u.id === decoded.userId) || 
+             memoryDB.users.find(u => u.id === decoded.userId);
     }
     
     if (user && user.isActive) {
