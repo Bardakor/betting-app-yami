@@ -12,12 +12,16 @@ import {
   Target,
   Clock,
   TrendingUp,
-  ChevronLeft
+  ChevronLeft,
+  BookOpen,
+  Zap
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Live Matches', href: '/live-matches', icon: Play },
+  { name: 'API Docs', href: '/docs', icon: BookOpen },
+  { name: 'API Test', href: '/api-test', icon: Zap },
   { name: 'Profile', href: '/profile', icon: User },
 ];
 
