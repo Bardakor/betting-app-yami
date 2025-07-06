@@ -2,11 +2,6 @@ const mongoose = require('mongoose');
 const { memoryDB } = require('../config/database');
 
 const TransactionSchema = new mongoose.Schema({
-  transactionId: {
-    type: String,
-    unique: true,
-    sparse: true
-  },
   userId: {
     type: String,
     required: true
@@ -47,8 +42,10 @@ const MongoTransaction = mongoose.model('Transaction', TransactionSchema);
 // In-memory transaction operations
 class InMemoryTransaction {
   constructor(data) {
-    // Don't set _id for MongoDB - let it auto-generate
-    this.transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Only set custom ID for in-memory storage, let MongoDB generate ObjectId
+    if (mongoose.connection.readyState !== 1) {
+      this._id = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
     this.userId = data.userId;
     this.type = data.type;
     this.amount = data.amount;
@@ -61,35 +58,14 @@ class InMemoryTransaction {
   }
 
   async save() {
-    try {
-      if (mongoose.connection.readyState === 1) {
-        // MongoDB is connected, use mongoose
-        // Don't pass _id, let MongoDB generate it
-        const mongoData = {
-          transactionId: this.transactionId,
-          userId: this.userId,
-          type: this.type,
-          amount: this.amount,
-          balanceAfter: this.balanceAfter,
-          description: this.description,
-          metadata: this.metadata,
-          status: this.status
-        };
-        const mongoDoc = new MongoTransaction(mongoData);
-        const saved = await mongoDoc.save();
-        // Update local object with MongoDB _id
-        this._id = saved._id;
-        return this;
-      } else {
-        // Use in-memory storage
-        this._id = this.transactionId;
-        memoryDB.transactions.push(this);
-        return this;
-      }
-    } catch (error) {
-      console.log('MongoDB save failed, falling back to in-memory storage:', error.message);
-      // Fallback to in-memory storage
-      this._id = this.transactionId;
+    if (mongoose.connection.readyState === 1) {
+      // MongoDB is connected, use mongoose
+      const mongoDoc = new MongoTransaction(this);
+      const saved = await mongoDoc.save();
+      Object.assign(this, saved.toObject());
+      return this;
+    } else {
+      // Use in-memory storage
       memoryDB.transactions.push(this);
       return this;
     }

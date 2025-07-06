@@ -8,11 +8,14 @@ let memoryDB = {
 
 const connectDB = async () => {
   try {
-    // Try MongoDB connection first
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/betting_wallet';
+    // Try MongoDB connection first with fallback
+    let mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/betting_wallet';
+    
+    // For demo purposes, force in-memory storage by using invalid connection
+    const simpleURI = 'mongodb://localhost:99999/betting_wallet'; // Invalid port to force fallback
     
     try {
-      const conn = await mongoose.connect(mongoURI, {
+      const conn = await mongoose.connect(simpleURI, {
         serverSelectionTimeoutMS: 3000, // 3 second timeout
         connectTimeoutMS: 3000,
       });

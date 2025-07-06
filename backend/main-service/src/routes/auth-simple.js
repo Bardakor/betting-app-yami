@@ -386,56 +386,10 @@ router.post('/update-balance', (req, res) => {
 
 // @route   POST /auth/admin/update-user-balance
 // @desc    Admin update any user's balance
-// @access  Private (Admin only or internal service calls)
+// @access  Private (Admin only)
 router.post('/admin/update-user-balance', (req, res) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    const serviceAuth = req.header('X-Service-Auth');
-    
-    // Allow internal service calls
-    if (serviceAuth === 'wallet-service-internal' || serviceAuth === 'bet-service-internal') {
-      const { userId, amount, operation } = req.body;
-
-      if (!userId || !amount || !operation || !['add', 'subtract'].includes(operation)) {
-        return res.status(400).json({
-          success: false,
-          message: 'User ID, valid amount, and operation (add/subtract) are required'
-        });
-      }
-
-      const user = users.find(u => u.id === userId);
-      
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
-
-      if (operation === 'add') {
-        user.balance += parseFloat(amount);
-      } else {
-        if (user.balance < parseFloat(amount)) {
-          return res.status(400).json({
-            success: false,
-            message: 'User has insufficient balance'
-          });
-        }
-        user.balance -= parseFloat(amount);
-      }
-
-      return res.json({
-        success: true,
-        message: 'User balance updated successfully',
-        newBalance: user.balance,
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName
-        }
-      });
-    }
     
     if (!token) {
       return res.status(401).json({

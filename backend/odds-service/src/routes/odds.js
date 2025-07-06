@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const AdvancedOddsCalculator = require('../services/oddsCalculator');
+const AdvancedOddsCalculator = require('../services/oddsCalculatorMongo');
 const { dbAll, dbGet } = require('../config/database');
 
 const calculator = new AdvancedOddsCalculator();

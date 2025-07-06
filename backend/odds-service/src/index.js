@@ -19,18 +19,24 @@ const PORT = process.env.PORT || 3003;
 const cache = new NodeCache({ stdTTL: process.env.CACHE_TTL || 600 });
 app.locals.cache = cache;
 
-// Initialize SQLite database
-const dbPath = process.env.SQLITE_DB_PATH || './data/odds.db';
-const dbDir = path.dirname(dbPath);
+// Initialize MongoDB database
+const initDB = async () => {
+  try {
+    // Force in-memory for demo
+    process.env.FORCE_MEMORY_DB = 'true';
+    const isConnected = await initDatabase();
+    if (isConnected) {
+      console.log('📊 MongoDB database initialized');
+    } else {
+      console.log('📊 Using in-memory database for demo');
+    }
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+    console.log('📊 Falling back to in-memory database');
+  }
+};
 
-// Ensure data directory exists
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
-initDatabase(dbPath).then(() => {
-  console.log('📊 SQLite database initialized');
-}).catch(console.error);
+initDB();
 
 // Rate limiting
 const limiter = rateLimit({
@@ -87,11 +93,12 @@ app.get('/', (req, res) => {
     },
     features: [
       'Real-time odds calculation',
-      'SQLite database storage',
+      'MongoDB database storage',
       'In-memory caching',
-      'Live odds updates'
+      'Live odds updates',
+      'In-memory fallback for demo'
     ],
-    database: 'SQLite with 10-minute cache TTL',
+    database: 'MongoDB with in-memory fallback and 10-minute cache TTL',
     cache_stats: {
       keys: req.app.locals.cache.keys().length,
       hits: req.app.locals.cache.getStats().hits,

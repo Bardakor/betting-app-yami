@@ -2,14 +2,13 @@ const mongoose = require('mongoose');
 
 const betSchema = new mongoose.Schema({
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: 'User'
+    type: String, // Changed from ObjectId to String to match main service
+    required: true
   },
   
   // Match information
   fixtureId: {
-    type: Number,
+    type: String, // Changed from Number to String to support various ID formats
     required: true
   },
   
@@ -208,4 +207,89 @@ betSchema.statics.getUserStats = async function(userId) {
   return result;
 };
 
-module.exports = mongoose.model('Bet', betSchema); 
+module.exports = mongoose.model('Bet', betSchema);
+
+// In-memory storage fallback
+let inMemoryBets = [];
+let nextId = 1;
+
+const BetModel = {
+  async create(data) {
+    if (mongoose.connection.readyState === 1) {
+      return await mongoose.model('Bet', betSchema).create(data);
+    }
+    
+    // In-memory fallback
+    const newBet = {
+      _id: `bet_${nextId++}`,
+      ...data,
+      placedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      calculatePotentialWin() {
+        return this.stake * this.odds;
+      }
+    };
+    inMemoryBets.push(newBet);
+    console.log('✅ Bet saved to in-memory storage:', newBet._id);
+    return newBet;
+  },
+
+  async find(query = {}) {
+    if (mongoose.connection.readyState === 1) {
+      return await mongoose.model('Bet', betSchema).find(query);
+    }
+    
+    // In-memory fallback
+    return inMemoryBets.filter(bet => {
+      return Object.keys(query).every(key => 
+        query[key] === undefined || bet[key] === query[key]
+      );
+    });
+  },
+
+  async findById(id) {
+    if (mongoose.connection.readyState === 1) {
+      return await mongoose.model('Bet', betSchema).findById(id);
+    }
+    
+    // In-memory fallback
+    return inMemoryBets.find(bet => bet._id === id);
+  },
+
+  async findOne(query) {
+    if (mongoose.connection.readyState === 1) {
+      return await mongoose.model('Bet', betSchema).findOne(query);
+    }
+    
+    // In-memory fallback
+    return inMemoryBets.find(bet => {
+      return Object.keys(query).every(key => 
+        query[key] === undefined || bet[key] === query[key]
+      );
+    });
+  },
+
+  async findByIdAndUpdate(id, update, options = {}) {
+    if (mongoose.connection.readyState === 1) {
+      return await mongoose.model('Bet', betSchema).findByIdAndUpdate(id, update, options);
+    }
+    
+    // In-memory fallback
+    const index = inMemoryBets.findIndex(bet => bet._id === id);
+    if (index !== -1) {
+      inMemoryBets[index] = { ...inMemoryBets[index], ...update, updatedAt: new Date() };
+      return inMemoryBets[index];
+    }
+    return null;
+  },
+
+  // Clear in-memory data (for testing)
+  clearMemory() {
+    inMemoryBets = [];
+    nextId = 1;
+  }
+};
+
+// Export the model wrapper instead of the direct mongoose model
+module.exports = BetModel; 

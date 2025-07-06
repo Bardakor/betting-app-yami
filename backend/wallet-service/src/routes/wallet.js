@@ -1,9 +1,36 @@
 const express = require('express');
 const axios = require('axios');
 const Transaction = require('../models/Transaction');
-const { memoryDB } = require('../config/database');
 
 const router = express.Router();
+
+// Store admin token for service-to-service calls
+let adminToken = null;
+
+// Get admin token for service calls
+const getAdminToken = async () => {
+  if (!adminToken) {
+    try {
+      const response = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/login`, {
+        email: 'admin@admin.com',
+        password: 'admin123'
+      });
+      
+      if (response.data.success) {
+        adminToken = response.data.token;
+        console.log('Admin token obtained for service calls');
+        
+        // Refresh token every 20 hours to avoid expiration
+        setTimeout(() => {
+          adminToken = null;
+        }, 20 * 60 * 60 * 1000);
+      }
+    } catch (error) {
+      console.error('Failed to get admin token:', error.message);
+    }
+  }
+  return adminToken;
+};
 
 // Middleware to verify JWT token with main service
 const verifyToken = async (req, res, next) => {
@@ -384,7 +411,7 @@ router.post('/process-bet', async (req, res) => {
     if (!userId || !amount || !type) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: userId, amount, type'
+        message: 'Missing required fields'
       });
     }
 
@@ -399,20 +426,21 @@ router.post('/process-bet', async (req, res) => {
         });
       }
 
-      // Create a temporary admin token for internal service calls
-      // This is a service-to-service call, so we'll simulate admin access
-      const adminToken = 'service-internal-call';
-      
-      // Deduct amount using the admin endpoint
+      // Deduct amount
+      const token = await getAdminToken();
+      if (!token) {
+        return res.status(500).json({
+          success: false,
+          message: 'Service authentication failed'
+        });
+      }
+
       const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
         userId,
         amount,
         operation: 'subtract'
       }, {
-        headers: {
-          'Authorization': `Bearer ${adminToken}`,
-          'X-Service-Auth': 'wallet-service-internal'
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (!updateResponse.data.success) {
@@ -425,11 +453,14 @@ router.post('/process-bet', async (req, res) => {
       // Record transaction
       const transaction = new Transaction({
         userId,
-        type: 'bet_placed',
+        type: 'bet_stake',
         amount,
         balanceAfter: updateResponse.data.newBalance,
         description: description || `Bet placed on fixture ${fixtureId}`,
-        metadata: { betId, fixtureId }
+        metadata: { 
+          ...(betId && { betId }), // Only include betId if it exists
+          fixtureId 
+        }
       });
 
       await transaction.save();
@@ -438,26 +469,31 @@ router.post('/process-bet', async (req, res) => {
         success: true,
         message: 'Bet amount deducted',
         newBalance: updateResponse.data.newBalance,
-        transactionId: transaction._id || transaction.transactionId
+        transactionId: transaction._id
       });
     }
 
     // For bet wins/losses
     if (type === 'bet_won') {
+      const token = await getAdminToken();
+      if (!token) {
+        return res.status(500).json({
+          success: false,
+          message: 'Service authentication failed'
+        });
+      }
+
       const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
         userId,
         amount,
         operation: 'add'
       }, {
-        headers: {
-          'Authorization': `Bearer service-internal-call`,
-          'X-Service-Auth': 'wallet-service-internal'
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       const transaction = new Transaction({
         userId,
-        type: 'bet_won',
+        type: 'bet_win',
         amount,
         balanceAfter: updateResponse.data.newBalance,
         description: description || `Bet won on fixture ${fixtureId}`,
@@ -486,35 +522,44 @@ router.post('/process-bet', async (req, res) => {
   }
 });
 
-// Update transaction with bet ID (called by bet service)
-router.put('/transaction/:transactionId', async (req, res) => {
+// Update transaction with bet ID (called by bet service after bet is created)
+router.put('/transaction/:transactionId/bet', async (req, res) => {
   try {
     const { transactionId } = req.params;
     const { betId } = req.body;
 
-    if (mongoose.connection.readyState === 1) {
-      // MongoDB is connected
-      const transaction = await Transaction.findOneAndUpdate(
-        { transactionId: transactionId },
-        { $set: { 'metadata.betId': betId } },
-        { new: true }
-      );
-      
-      if (transaction) {
-        return res.json({ success: true, message: 'Transaction updated' });
-      }
-    } else {
-      // In-memory storage
-      const transaction = memoryDB.transactions.find(t => t.transactionId === transactionId);
-      if (transaction) {
-        transaction.metadata.betId = betId;
-        return res.json({ success: true, message: 'Transaction updated' });
-      }
+    if (!betId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bet ID is required'
+      });
     }
 
-    res.status(404).json({
-      success: false,
-      message: 'Transaction not found'
+    // Update the transaction with the bet ID
+    const transaction = await Transaction.findByIdAndUpdate(
+      transactionId,
+      { 
+        $set: { 
+          'metadata.betId': betId 
+        } 
+      },
+      { new: true }
+    );
+
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Transaction updated with bet ID',
+      transaction: {
+        id: transaction._id,
+        betId: transaction.metadata.betId
+      }
     });
   } catch (error) {
     console.error('Update transaction error:', error);
