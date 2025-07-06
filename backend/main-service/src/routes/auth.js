@@ -3,9 +3,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const { memoryDB } = require('../config/database');
 const passport = require('passport');
 const { auth } = require('../middleware/auth');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -53,17 +53,7 @@ const sendUserResponse = (res, user, token = null) => {
 
 // Helper function to find user in memory or MongoDB
 const findUserByEmail = async (email) => {
-  try {
-    // Try MongoDB first
-    if (User.findOne) {
-      return await User.findOne({ email });
-    }
-  } catch (error) {
-    console.log('MongoDB not available, using memory DB');
-  }
-  
-  // Fallback to memory database
-  return memoryDB.users.find(user => user.email === email);
+  return await User.findOne({ email });
 };
 
 // Helper function to compare password
@@ -74,6 +64,18 @@ const comparePassword = async (inputPassword, userPassword) => {
     // Simple comparison for demo (not secure)
     return inputPassword === 'admin123' && userPassword.includes('admin123');
   }
+};
+
+// Helper to find user by either _id or googleId
+const findUserByIdOrGoogleId = async (id) => {
+  let user = null;
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    user = await User.findById(id);
+    if (user) return user;
+  }
+  // Fallback to googleId
+  user = await User.findOne({ googleId: id });
+  return user;
 };
 
 // Validation middleware
@@ -160,21 +162,8 @@ router.post('/register', [
     };
 
     let user;
-    try {
-      // Try MongoDB first
-      if (User.create) {
-        user = await User.create(userData);
-      } else {
-        throw new Error('MongoDB not available');
-      }
-    } catch (error) {
-      // Use memory database
-      userData._id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      userData.id = userData._id;
-      memoryDB.users.push(userData);
-      user = userData;
-      console.log('✅ User created in memory database');
-    }
+    // Create user in MongoDB
+    user = await User.create(userData);
 
     // Generate JWT token
     const token = generateToken(user._id || user.id);
@@ -515,12 +504,206 @@ router.post('/refresh-token', auth, async (req, res) => {
 });
 
 // Health check
-router.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Auth service is healthy',
-    memoryUsers: memoryDB.users.length
-  });
+router.get('/health', async (req, res) => {
+  try {
+    const userCount = await User.countDocuments();
+    res.status(200).json({
+      success: true,
+      message: 'Auth service is healthy',
+      userCount: userCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Database connection error'
+    });
+  }
+});
+
+// @route   POST /auth/update-balance
+// @desc    Update user balance (for authenticated users)
+// @access  Private
+router.post('/update-balance', auth, async (req, res) => {
+  try {
+    const { amount, operation } = req.body;
+    
+    const user = await User.findById(req.userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const currentBalance = user.balance || 0;
+    let newBalance;
+
+    if (operation === 'add') {
+      newBalance = currentBalance + parseFloat(amount);
+    } else if (operation === 'subtract') {
+      newBalance = currentBalance - parseFloat(amount);
+      if (newBalance < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient balance'
+        });
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid operation. Use "add" or "subtract"'
+      });
+    }
+
+    user.balance = newBalance;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Balance updated successfully',
+      userId: user._id,
+      oldBalance: currentBalance,
+      newBalance: newBalance,
+      operation: operation,
+      amount: parseFloat(amount)
+    });
+  } catch (error) {
+    console.error('Error updating user balance:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// @route   GET /auth/user/:userId/balance
+// @desc    Get user balance by ID (for service-to-service calls)
+// @access  Public (service-to-service)
+router.get('/user/:userId/balance', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await findUserByIdOrGoogleId(userId);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.json({ success: true, balance: user.balance || 0, userId: user._id });
+  } catch (error) {
+    console.error('Error fetching user balance:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// @route   POST /auth/admin/update-user-balance
+// @desc    Update user balance (for service-to-service calls with admin token)
+// @access  Private (admin only)
+router.post('/admin/update-user-balance', auth, async (req, res) => {
+  try {
+    const { userId, amount, operation } = req.body;
+    
+    // Verify admin role
+    if (req.user.role !== 'admin' && req.user.email !== 'admin@admin.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    const user = await findUserByIdOrGoogleId(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const currentBalance = user.balance || 0;
+    let newBalance;
+
+    if (operation === 'add') {
+      newBalance = currentBalance + parseFloat(amount);
+    } else if (operation === 'subtract') {
+      newBalance = currentBalance - parseFloat(amount);
+      if (newBalance < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient balance'
+        });
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid operation. Use "add" or "subtract"'
+      });
+    }
+
+    user.balance = newBalance;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Balance updated successfully',
+      userId: user._id,
+      oldBalance: currentBalance,
+      newBalance: newBalance,
+      operation: operation,
+      amount: parseFloat(amount)
+    });
+  } catch (error) {
+    console.error('Error updating user balance:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// @route   GET /auth/admin/user/:userId
+// @desc    Get user details by ID (for service-to-service calls)
+// @access  Private (admin only)
+router.get('/admin/user/:userId', auth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Verify admin role
+    if (req.user.role !== 'admin' && req.user.email !== 'admin@admin.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    const user = await findUserByIdOrGoogleId(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        balance: user.balance || 0,
+        isActive: user.isActive,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
 });
 
 module.exports = router; 

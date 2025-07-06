@@ -19,6 +19,12 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - ${req.ip}`);
+  next();
+});
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
@@ -218,10 +224,10 @@ app.use('/api/odds', createProxyMiddleware({
  */
 // Proxy to Wallet Service
 app.use('/api/wallet', createProxyMiddleware({
-  target: `${services.wallet}/api/wallet`,
+  target: services.wallet,
   changeOrigin: true,
   pathRewrite: {
-    '^/api/wallet': ''
+    '^/api/wallet': '/api/wallet'
   },
   onError: (err, req, res) => {
     console.error('Wallet Service proxy error:', err.message);

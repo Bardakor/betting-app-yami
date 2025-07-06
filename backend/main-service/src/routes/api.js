@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 
 const User = require('../models/User');
 const Bet = require('../models/Bet');
-const { memoryDB } = require('../config/database');
 const { auth, optionalAuth, checkBalance, bettingRateLimit, validateBetLimits } = require('../middleware/auth');
 
 const router = express.Router();
@@ -634,15 +633,7 @@ router.get('/verify-token', async (req, res) => {
 // Get user profile
 router.get('/user/profile', auth, async (req, res) => {
   try {
-    let user;
-    
-    // Check if using MongoDB or in-memory database
-    if (mongoose.connection.readyState === 1) {
-      user = await User.findById(req.user.userId).select('-password');
-    } else {
-      // Use in-memory database
-      user = memoryDB.users.find(u => u.id === req.user.userId);
-    }
+    const user = await User.findById(req.user.userId).select('-password');
     
     if (!user) {
       return res.status(404).json({
@@ -692,15 +683,7 @@ router.post('/user/update-balance', auth, async (req, res) => {
       });
     }
 
-    let user;
-    
-    // Check if using MongoDB or in-memory database
-    if (mongoose.connection.readyState === 1) {
-      user = await User.findById(req.user.userId);
-    } else {
-      // Use in-memory database
-      user = memoryDB.users.find(u => u.id === req.user.userId);
-    }
+    const user = await User.findById(req.user.userId);
     
     if (!user) {
       return res.status(404).json({
@@ -722,10 +705,7 @@ router.post('/user/update-balance', auth, async (req, res) => {
     }
 
     // Save changes
-    if (mongoose.connection.readyState === 1) {
-      await user.save();
-    }
-    // In-memory changes are automatically saved since user is a reference
+    await user.save();
 
     res.json({
       success: true,
@@ -982,16 +962,8 @@ router.get('/user/stats', auth, async (req, res) => {
 // Create admin user if not exists
 router.post('/admin/create', async (req, res) => {
   try {
-    // Check if admin already exists in memory or MongoDB
-    let existingAdmin;
-    try {
-      if (User.findOne) {
-        existingAdmin = await User.findOne({ email: 'admin@admin.com' });
-      }
-    } catch (error) {
-      // Check memory database
-      existingAdmin = memoryDB.users.find(user => user.email === 'admin@admin.com');
-    }
+    // Check if admin already exists
+    const existingAdmin = await User.findOne({ email: 'admin@admin.com' });
 
     if (existingAdmin) {
       return res.status(200).json({
@@ -1025,20 +997,8 @@ router.post('/admin/create', async (req, res) => {
       createdAt: new Date()
     };
 
-    try {
-      // Try MongoDB first
-      if (User.create) {
-        await User.create(adminData);
-      } else {
-        throw new Error('MongoDB not available');
-      }
-    } catch (error) {
-      // Use memory database
-      adminData._id = 'admin123';
-      adminData.id = adminData._id;
-      memoryDB.users.push(adminData);
-      console.log('✅ Admin user created in memory database');
-    }
+    // Create admin user in MongoDB
+    await User.create(adminData);
 
     res.json({
       success: true,

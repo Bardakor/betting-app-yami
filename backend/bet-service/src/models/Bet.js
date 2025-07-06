@@ -3,13 +3,15 @@ const mongoose = require('mongoose');
 const betSchema = new mongoose.Schema({
   userId: {
     type: String, // Changed from ObjectId to String to match main service
-    required: true
+    required: true,
+    index: true
   },
   
   // Match information
   fixtureId: {
     type: String, // Changed from Number to String to support various ID formats
-    required: true
+    required: true,
+    index: true
   },
   
   // Bet details
@@ -64,13 +66,15 @@ const betSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['active', 'won', 'lost', 'void', 'cancelled'],
-    default: 'active'
+    default: 'active',
+    index: true
   },
   
   result: {
     isSettled: {
       type: Boolean,
-      default: false
+      default: false,
+      index: true
     },
     settledAt: Date,
     finalScore: {
@@ -86,7 +90,8 @@ const betSchema = new mongoose.Schema({
   // Metadata
   placedAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true
   },
   
   ipAddress: String,
@@ -95,12 +100,21 @@ const betSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for performance
-betSchema.index({ userId: 1, createdAt: -1 });
-betSchema.index({ fixtureId: 1 });
-betSchema.index({ status: 1 });
-betSchema.index({ placedAt: -1 });
-betSchema.index({ 'result.isSettled': 1 });
+// Create a virtual for id that returns _id as a string
+betSchema.virtual('id').get(function() {
+  return this._id.toString();
+});
+
+// Ensure virtual fields are serialized
+betSchema.set('toJSON', {
+  virtuals: true,
+  transform: (doc, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  }
+});
 
 // Virtual for profit/loss
 betSchema.virtual('profitLoss').get(function() {
@@ -173,7 +187,7 @@ betSchema.methods.checkBetResult = function(matchResult) {
 // Static methods
 betSchema.statics.getUserStats = async function(userId) {
   const stats = await this.aggregate([
-    { $match: { userId: mongoose.Types.ObjectId(userId) } },
+    { $match: { userId: userId } },
     {
       $group: {
         _id: null,
@@ -207,89 +221,4 @@ betSchema.statics.getUserStats = async function(userId) {
   return result;
 };
 
-module.exports = mongoose.model('Bet', betSchema);
-
-// In-memory storage fallback
-let inMemoryBets = [];
-let nextId = 1;
-
-const BetModel = {
-  async create(data) {
-    if (mongoose.connection.readyState === 1) {
-      return await mongoose.model('Bet', betSchema).create(data);
-    }
-    
-    // In-memory fallback
-    const newBet = {
-      _id: `bet_${nextId++}`,
-      ...data,
-      placedAt: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      calculatePotentialWin() {
-        return this.stake * this.odds;
-      }
-    };
-    inMemoryBets.push(newBet);
-    console.log('✅ Bet saved to in-memory storage:', newBet._id);
-    return newBet;
-  },
-
-  async find(query = {}) {
-    if (mongoose.connection.readyState === 1) {
-      return await mongoose.model('Bet', betSchema).find(query);
-    }
-    
-    // In-memory fallback
-    return inMemoryBets.filter(bet => {
-      return Object.keys(query).every(key => 
-        query[key] === undefined || bet[key] === query[key]
-      );
-    });
-  },
-
-  async findById(id) {
-    if (mongoose.connection.readyState === 1) {
-      return await mongoose.model('Bet', betSchema).findById(id);
-    }
-    
-    // In-memory fallback
-    return inMemoryBets.find(bet => bet._id === id);
-  },
-
-  async findOne(query) {
-    if (mongoose.connection.readyState === 1) {
-      return await mongoose.model('Bet', betSchema).findOne(query);
-    }
-    
-    // In-memory fallback
-    return inMemoryBets.find(bet => {
-      return Object.keys(query).every(key => 
-        query[key] === undefined || bet[key] === query[key]
-      );
-    });
-  },
-
-  async findByIdAndUpdate(id, update, options = {}) {
-    if (mongoose.connection.readyState === 1) {
-      return await mongoose.model('Bet', betSchema).findByIdAndUpdate(id, update, options);
-    }
-    
-    // In-memory fallback
-    const index = inMemoryBets.findIndex(bet => bet._id === id);
-    if (index !== -1) {
-      inMemoryBets[index] = { ...inMemoryBets[index], ...update, updatedAt: new Date() };
-      return inMemoryBets[index];
-    }
-    return null;
-  },
-
-  // Clear in-memory data (for testing)
-  clearMemory() {
-    inMemoryBets = [];
-    nextId = 1;
-  }
-};
-
-// Export the model wrapper instead of the direct mongoose model
-module.exports = BetModel; 
+module.exports = mongoose.model('Bet', betSchema); 

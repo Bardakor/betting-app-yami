@@ -1,41 +1,26 @@
 const mongoose = require('mongoose');
 
-// In-memory database fallback for demo purposes
-let memoryDB = {
-  results: [],
-  connected: false
-};
-
 const connectDB = async () => {
   try {
-    // Try MongoDB connection first
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://result_user:service123@localhost:27017/betting_results?authSource=betting_results';
+    // Use betting-mongodb for Docker network, localhost for local development
+    const mongoHost = process.env.MONGO_HOST || 'localhost';
     
-    try {
-      const conn = await mongoose.connect(mongoURI, {
-        serverSelectionTimeoutMS: 5000, // 5 second timeout
-        connectTimeoutMS: 5000,
-      });
-      console.log(`🗄️  Result MongoDB Connected: ${conn.connection.host}`);
-      return;
-    } catch (mongoError) {
-      console.log('📦 MongoDB not available for result service, using in-memory storage for demo');
-      
-      // Initialize in-memory database
-      memoryDB.connected = true;
-      memoryDB.results = [];
-      
-      console.log('💾 In-memory result database initialized');
-      console.log('🔧 All result operations will use memory storage');
-      return;
-    }
+    // Connect without authentication for local development
+    const mongoURI = process.env.MONGODB_URI || `mongodb://${mongoHost}:27017/betting_results`;
+    
+    console.log(`🔗 Connecting to MongoDB: ${mongoHost}:27017/betting_results`);
+    
+    await mongoose.connect(mongoURI, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+    });
+    
+    console.log(`🗄️  Result MongoDB Connected: ${mongoose.connection.host}`);
   } catch (error) {
     console.error('❌ Result Database connection error:', error.message);
-    // Don't exit, fall back to in-memory
-    memoryDB.connected = true;
-    memoryDB.results = [];
-    console.log('💾 Falling back to in-memory result storage');
+    console.error('💥 Result service requires MongoDB to be running');
+    process.exit(1);
   }
 };
 
-module.exports = { connectDB, memoryDB }; 
+module.exports = { connectDB }; 

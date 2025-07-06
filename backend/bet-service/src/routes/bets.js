@@ -23,6 +23,17 @@ router.get('/', (req, res) => {
   });
 });
 
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Bet Service API is healthy',
+    service: 'bet-service',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Middleware to verify JWT token with main service
 const verifyToken = async (req, res, next) => {
   try {
@@ -49,8 +60,33 @@ const verifyToken = async (req, res, next) => {
       });
     }
 
-    req.user = { id: response.data.userId };
-    console.log('Set req.user to:', req.user);
+    // Get user profile for full details
+    try {
+      const profileResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (profileResponse.data.success) {
+        const user = profileResponse.data.user;
+        req.user = {
+          id: user.id || user._id,
+          _id: user.id || user._id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: user.fullName,
+          balance: user.balance,
+          role: user.email === 'admin@admin.com' ? 'admin' : 'user'
+        };
+        console.log('User authenticated:', req.user.email, 'ID:', req.user.id);
+      } else {
+        req.user = { id: response.data.userId };
+      }
+    } catch (profileError) {
+      console.log('Failed to get profile, using basic info:', profileError.message);
+      req.user = { id: response.data.userId };
+    }
+    
     next();
   } catch (error) {
     console.error('Token verification error:', error);
@@ -178,7 +214,65 @@ router.post('/place', verifyToken, async (req, res) => {
       // Continue with provided odds if odds service is unavailable
     }
 
+    // Normalize bet type to enum format (e.g. "Match Winner" -> "match_winner")
+    const normalizedBetType = betType.toLowerCase().replace(/\s+/g, '_');
+
+    // Quick sanity-check that the type is supported BEFORE we touch the wallet
+    const allowedBetTypes = ['match_winner', 'over_under', 'both_teams_score', 'double_chance', 'exact_score'];
+    if (!allowedBetTypes.includes(normalizedBetType)) {
+      return res.status(400).json({
+        success: false,
+        message: `Unsupported betType: ${betType}. Allowed: ${allowedBetTypes.join(', ')}`
+      });
+    }
+
     const potentialWin = stake * odds;
+
+    // ---------------------------------------------
+    // 1. Create bet instance & validate WITH Mongoose (no persistence yet)
+    // ---------------------------------------------
+    const betDraft = new Bet({
+      userId: req.user.id,
+      fixtureId,
+      betType: normalizedBetType,
+      selection,
+      stake,
+      odds,
+      potentialWin,
+      matchInfo: {
+        homeTeam: {
+          id: fixture.teams.home.id,
+          name: fixture.teams.home.name
+        },
+        awayTeam: {
+          id: fixture.teams.away.id,
+          name: fixture.teams.away.name
+        },
+        league: {
+          id: fixture.league.id,
+          name: fixture.league.name,
+          country: fixture.league.country
+        },
+        kickoffTime: new Date(fixture.fixture.date)
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    // Run schema validation before charging wallet
+    try {
+      await betDraft.validate();
+    } catch (validationErr) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bet validation failed',
+        errors: validationErr.errors
+      });
+    }
+
+    // ---------------------------------------------
+    // 2. Charge wallet (deduct stake)
+    // ---------------------------------------------
 
     // Process payment with wallet service
     console.log('Processing payment with wallet service for user:', req.user);
@@ -209,36 +303,9 @@ router.post('/place', verifyToken, async (req, res) => {
     }
 
     // Create bet record
-    const bet = await Bet.create({
-      userId: req.user.id,
-      fixtureId,
-      betType,
-      selection,
-      stake,
-      odds,
-      potentialWin,
-      matchInfo: {
-        homeTeam: {
-          id: fixture.teams.home.id,
-          name: fixture.teams.home.name
-        },
-        awayTeam: {
-          id: fixture.teams.away.id,
-          name: fixture.teams.away.name
-        },
-        league: {
-          id: fixture.league.id,
-          name: fixture.league.name,
-          country: fixture.league.country
-        },
-        kickoffTime: new Date(fixture.fixture.date)
-      },
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    });
-
-    // Bet is already saved by Bet.create()
-    console.log('✅ Bet created successfully:', bet._id);
+    // Persist the previously validated draft
+    const bet = await betDraft.save();
+    console.log('✅ Bet saved to MongoDB:', bet._id);
 
     // Update wallet transaction with bet ID
     if (walletResponse.data.transactionId) {
@@ -456,7 +523,7 @@ router.get('/stats/summary', verifyToken, async (req, res) => {
 router.get('/admin/all', verifyToken, async (req, res) => {
   try {
     // Check if user is admin
-    if (req.user.email !== 'admin@admin.com') {
+    if (req.user.role !== 'admin' && req.user.email !== 'admin@admin.com') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Admin privileges required.'

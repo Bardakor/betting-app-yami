@@ -2,25 +2,24 @@ const mongoose = require('mongoose');
 
 const initDatabase = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/odds_service';
+    // Use betting-mongodb for Docker network, localhost for local development
+    const mongoHost = process.env.MONGO_HOST || 'localhost';
     
-    // Force connection failure for demo purposes to use in-memory fallback
-    if (process.env.FORCE_MEMORY_DB === 'true') {
-      throw new Error('Forced to use in-memory database for demo');
-    }
+    // Connect without authentication for local development
+    const mongoURI = process.env.MONGODB_URI || `mongodb://${mongoHost}:27017/betting_main`;
     
-    await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    console.log(`🔗 Connecting to MongoDB: ${mongoHost}:27017/betting_main`);
+    
+    await mongoose.connect(mongoURI);
     
     console.log('✅ Connected to MongoDB (odds service)');
+    console.log(`📊 MongoDB database initialized`);
     return true;
     
   } catch (error) {
-    console.log('❌ MongoDB connection failed, using in-memory database for demo');
-    console.log('MongoDB Error:', error.message);
-    return false;
+    console.error('❌ MongoDB connection failed for odds service:', error.message);
+    console.error('💥 Odds service requires MongoDB to be running');
+    process.exit(1);
   }
 };
 

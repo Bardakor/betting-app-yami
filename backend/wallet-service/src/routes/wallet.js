@@ -45,8 +45,12 @@ const verifyToken = async (req, res, next) => {
     }
 
     // Verify token with main service
-    const response = await axios.get(`${process.env.MAIN_SERVICE_URL}/auth/verify-token`, {
-      headers: { Authorization: `Bearer ${token}` }
+    const mainServiceUrl = process.env.MAIN_SERVICE_URL || 'http://localhost:3001';
+    console.log(`Verifying token with main service: ${mainServiceUrl}`);
+    
+    const response = await axios.get(`${mainServiceUrl}/auth/verify-token`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 5000 // 5 second timeout
     });
 
     if (!response.data.success) {
@@ -57,18 +61,30 @@ const verifyToken = async (req, res, next) => {
     }
 
     // Get user details from profile endpoint
-    const profileResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/auth/profile`, {
-      headers: { Authorization: `Bearer ${token}` }
+    const profileResponse = await axios.get(`${mainServiceUrl}/auth/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 5000 // 5 second timeout
     });
 
     if (profileResponse.data.success) {
-      req.user = profileResponse.data.user;
+      const user = profileResponse.data.user;
+      req.user = {
+        id: user.id || user._id,
+        _id: user.id || user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: user.fullName,
+        balance: user.balance,
+        role: user.email === 'admin@admin.com' ? 'admin' : 'user'
+      };
+      console.log('User authenticated:', req.user.email, 'ID:', req.user.id);
     } else {
       req.user = { id: response.data.userId };
     }
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
+    console.error('Token verification error:', error.message);
     res.status(401).json({
       success: false,
       message: 'Invalid token'
@@ -91,6 +107,17 @@ router.get('/', (req, res) => {
       'POST /internal/deduct - Internal bet deduction (service-to-service)',
       'POST /internal/credit - Internal bet credit (service-to-service)'
     ],
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Wallet Service API is healthy',
+    service: 'wallet-service',
+    version: '1.0.0',
     timestamp: new Date().toISOString()
   });
 });
@@ -337,7 +364,7 @@ router.get('/transactions', verifyToken, async (req, res) => {
 router.post('/admin/add-funds', verifyToken, async (req, res) => {
   try {
     // Check if user is admin
-    if (req.user.email !== 'admin@admin.com') {
+    if (req.user.role !== 'admin' && req.user.email !== 'admin@admin.com') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Admin privileges required.'
@@ -353,13 +380,22 @@ router.post('/admin/add-funds', verifyToken, async (req, res) => {
       });
     }
 
+    // Get admin token for service-to-service call
+    const adminToken = await getAdminToken();
+    if (!adminToken) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to authenticate service'
+      });
+    }
+
     // Update balance in main service
     const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
       userId,
       amount,
       operation: 'add'
     }, {
-      headers: { Authorization: req.header('Authorization') }
+      headers: { Authorization: `Bearer ${adminToken}` }
     });
 
     if (!updateResponse.data.success) {
@@ -417,99 +453,181 @@ router.post('/process-bet', async (req, res) => {
 
     // For bet placement, check balance first
     if (type === 'bet_placed') {
-      const balanceResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/auth/user/${userId}/balance`);
-      
-      if (!balanceResponse.data.success || balanceResponse.data.balance < amount) {
-        return res.status(400).json({
-          success: false,
-          message: 'Insufficient balance'
-        });
-      }
+      try {
+        // Get user balance from main service with 5-second timeout
+        const balanceResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/auth/user/${userId}/balance`, { timeout: 5000 });
+        console.log('Balance response:', balanceResponse.data);
+        
+        if (!balanceResponse.data.success || balanceResponse.data.balance < amount) {
+          return res.status(400).json({
+            success: false,
+            message: 'Insufficient balance',
+            currentBalance: balanceResponse.data.balance || 0,
+            requiredAmount: amount
+          });
+        }
+        
+        // Get admin token for service-to-service call (fetch once and cache)
+        const token = await getAdminToken();
+        if (!token) {
+          return res.status(500).json({ success: false, message: 'Service authentication failed' });
+        }
 
-      // Deduct amount
-      const token = await getAdminToken();
-      if (!token) {
+        // Deduct amount from user balance (5-second timeout)
+        const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
+          userId,
+          amount,
+          operation: 'subtract'
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        });
+
+        if (!updateResponse.data.success) {
+          return res.status(400).json({
+            success: false,
+            message: updateResponse.data.message || 'Failed to deduct bet amount'
+          });
+        }
+
+        // Record transaction
+        const transaction = new Transaction({
+          userId,
+          type: 'bet_placed',
+          amount,
+          description: description || `Bet placed on fixture ${fixtureId}`,
+          status: 'completed'
+        });
+
+        await transaction.save();
+
+        return res.json({
+          success: true,
+          message: 'Bet amount deducted',
+          newBalance: updateResponse.data.newBalance,
+          transactionId: transaction._id
+        });
+      } catch (error) {
+        console.error('Error processing bet:', error.message);
         return res.status(500).json({
           success: false,
-          message: 'Service authentication failed'
+          message: 'Failed to process bet transaction',
+          error: error.message
         });
       }
-
-      const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
-        userId,
-        amount,
-        operation: 'subtract'
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (!updateResponse.data.success) {
-        return res.status(400).json({
-          success: false,
-          message: 'Failed to deduct bet amount'
-        });
-      }
-
-      // Record transaction
-      const transaction = new Transaction({
-        userId,
-        type: 'bet_stake',
-        amount,
-        balanceAfter: updateResponse.data.newBalance,
-        description: description || `Bet placed on fixture ${fixtureId}`,
-        metadata: { 
-          ...(betId && { betId }), // Only include betId if it exists
-          fixtureId 
-        }
-      });
-
-      await transaction.save();
-
-      return res.json({
-        success: true,
-        message: 'Bet amount deducted',
-        newBalance: updateResponse.data.newBalance,
-        transactionId: transaction._id
-      });
     }
 
     // For bet wins/losses
     if (type === 'bet_won') {
-      const token = await getAdminToken();
-      if (!token) {
+      try {
+        // Get admin token for service-to-service call
+        const token = await getAdminToken();
+        if (!token) {
+          return res.status(500).json({
+            success: false,
+            message: 'Service authentication failed'
+          });
+        }
+
+        // Add winnings to user balance
+        const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
+          userId,
+          amount,
+          operation: 'add'
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        });
+
+        if (!updateResponse.data.success) {
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to add winnings'
+          });
+        }
+
+        // Record transaction
+        const transaction = new Transaction({
+          userId,
+          type: 'bet_won',
+          amount,
+          description: description || `Bet won on fixture ${fixtureId}`,
+          status: 'completed'
+        });
+
+        await transaction.save();
+
+        return res.json({
+          success: true,
+          message: 'Winnings added to balance',
+          newBalance: updateResponse.data.newBalance
+        });
+      } catch (error) {
+        console.error('Error processing bet win:', error.message);
         return res.status(500).json({
           success: false,
-          message: 'Service authentication failed'
+          message: 'Failed to process bet win transaction',
+          error: error.message
         });
       }
-
-      const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
-        userId,
-        amount,
-        operation: 'add'
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      const transaction = new Transaction({
-        userId,
-        type: 'bet_win',
-        amount,
-        balanceAfter: updateResponse.data.newBalance,
-        description: description || `Bet won on fixture ${fixtureId}`,
-        metadata: { betId, fixtureId }
-      });
-
-      await transaction.save();
-
-      return res.json({
-        success: true,
-        message: 'Winnings added to balance',
-        newBalance: updateResponse.data.newBalance
-      });
     }
 
-    res.status(400).json({
+    // For bet refunds (cancelled bets)
+    if (type === 'bet_refund') {
+      try {
+        // Get admin token for service-to-service call
+        const token = await getAdminToken();
+        if (!token) {
+          return res.status(500).json({
+            success: false,
+            message: 'Service authentication failed'
+          });
+        }
+
+        // Add refund to user balance
+        const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
+          userId,
+          amount,
+          operation: 'add'
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        });
+
+        if (!updateResponse.data.success) {
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to process refund'
+          });
+        }
+
+        // Record transaction
+        const transaction = new Transaction({
+          userId,
+          type: 'bet_refund',
+          amount,
+          description: description || `Bet refunded for fixture ${fixtureId}`,
+          status: 'completed'
+        });
+
+        await transaction.save();
+
+        return res.json({
+          success: true,
+          message: 'Bet refunded successfully',
+          newBalance: updateResponse.data.newBalance
+        });
+      } catch (error) {
+        console.error('Error processing bet refund:', error.message);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to process bet refund',
+          error: error.message
+        });
+      }
+    }
+
+    return res.status(400).json({
       success: false,
       message: 'Invalid transaction type'
     });

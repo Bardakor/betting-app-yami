@@ -1,44 +1,28 @@
 const mongoose = require('mongoose');
 
-// In-memory database fallback for demo purposes
-let memoryDB = {
-  bets: [],
-  connected: false
-};
-
 const connectDB = async () => {
   try {
-    // Try MongoDB connection first with fallback
-    let mongoURI = process.env.MONGODB_URI || 'mongodb://bet_user:service123@localhost:27017/betting_bets?authSource=betting_bets';
+    // Use betting-mongodb for Docker network, localhost for local development
+    const mongoHost = process.env.MONGO_HOST || 'localhost';
     
-    // For demo purposes, force in-memory storage by using invalid connection
-    const simpleURI = 'mongodb://localhost:99999/betting_bets'; // Invalid port to force fallback
+    // Connect without authentication for local development
+    const mongoURI = process.env.MONGODB_URI || `mongodb://${mongoHost}:27017/betting_bets`;
     
-    try {
-      const conn = await mongoose.connect(simpleURI, {
-        serverSelectionTimeoutMS: 5000, // 5 second timeout
-        connectTimeoutMS: 5000,
-      });
-      console.log(`🗄️  Bet MongoDB Connected: ${conn.connection.host}`);
-      return;
-    } catch (mongoError) {
-      console.log('📦 MongoDB not available for bet service, using in-memory storage for demo');
-      
-      // Initialize in-memory database
-      memoryDB.connected = true;
-      memoryDB.bets = [];
-      
-      console.log('💾 In-memory bet database initialized');
-      console.log('🔧 All bet operations will use memory storage');
-      return;
-    }
+    console.log(`🔗 Connecting to MongoDB: ${mongoHost}:27017/betting_bets`);
+    
+    await mongoose.connect(mongoURI, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+    });
+    
+    console.log(`🗄️  MongoDB Connected: ${mongoose.connection.host}`);
+    console.log(`📊 Database: ${mongoose.connection.name}`);
+    
   } catch (error) {
-    console.error('❌ Bet Database connection error:', error.message);
-    // Don't exit, fall back to in-memory
-    memoryDB.connected = true;
-    memoryDB.bets = [];
-    console.log('💾 Falling back to in-memory bet storage');
+    console.error('❌ MongoDB connection failed:', error.message);
+    console.error('Please ensure MongoDB is running and accessible');
+    process.exit(1);
   }
 };
 
-module.exports = { connectDB, memoryDB }; 
+module.exports = { connectDB }; 

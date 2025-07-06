@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
-const { memoryDB } = require('../config/database');
 const { users } = require('../config/shared-users');
 
 // Main authentication middleware
@@ -23,16 +22,7 @@ const auth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
     
     // Get user from database
-    let user;
-    
-    // Check if using MongoDB or in-memory database
-    if (mongoose.connection.readyState === 1) {
-      user = await User.findById(decoded.userId);
-    } else {
-      // Try shared users first (from auth-simple), then fallback to memoryDB
-      user = users.find(u => u.id === decoded.userId) || 
-             memoryDB.users.find(u => u.id === decoded.userId);
-    }
+    const user = await User.findById(decoded.userId);
     
     if (!user) {
       return res.status(401).json({
@@ -48,9 +38,20 @@ const auth = async (req, res, next) => {
       });
     }
 
-    // Add user info to request object
-    req.userId = user._id ? user._id.toString() : user.id;
-    req.user = { userId: req.userId, ...user };
+    // Add user info to request object with consistent format
+    const userId = user._id ? user._id.toString() : user.id;
+    req.userId = userId;
+    req.user = {
+      id: userId,
+      _id: userId,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullName: user.fullName || `${user.firstName} ${user.lastName}`,
+      balance: user.balance,
+      role: user.email === 'admin@admin.com' ? 'admin' : 'user',
+      isActive: user.isActive
+    };
     req.token = token;
 
     next();
@@ -89,20 +90,22 @@ const optionalAuth = async (req, res, next) => {
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
     
-    let user;
-    
-    // Check if using MongoDB or in-memory database
-    if (mongoose.connection.readyState === 1) {
-      user = await User.findById(decoded.userId);
-    } else {
-      // Try shared users first (from auth-simple), then fallback to memoryDB
-      user = users.find(u => u.id === decoded.userId) || 
-             memoryDB.users.find(u => u.id === decoded.userId);
-    }
+    const user = await User.findById(decoded.userId);
     
     if (user && user.isActive) {
-      req.userId = user._id ? user._id.toString() : user.id;
-      req.user = { userId: req.userId, ...user };
+      const userId = user._id ? user._id.toString() : user.id;
+      req.userId = userId;
+      req.user = {
+        id: userId,
+        _id: userId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: user.fullName || `${user.firstName} ${user.lastName}`,
+        balance: user.balance,
+        role: user.email === 'admin@admin.com' ? 'admin' : 'user',
+        isActive: user.isActive
+      };
       req.token = token;
     }
 

@@ -1,59 +1,28 @@
 const mongoose = require('mongoose');
 
-// In-memory database fallback for demo purposes
-let memoryDB = {
-  users: [],
-  connected: false
-};
-
 const connectDB = async () => {
   try {
-    // Try MongoDB connection first
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/betting_app';
+    // Use betting-mongodb for Docker network, localhost for local development
+    const mongoHost = process.env.MONGO_HOST || 'localhost';
     
-    try {
-      const conn = await mongoose.connect(mongoURI, {
-        serverSelectionTimeoutMS: 3000, // 3 second timeout
-        connectTimeoutMS: 3000,
-      });
-      console.log(`🗄️  MongoDB Connected: ${conn.connection.host}`);
-      return;
-    } catch (mongoError) {
-      console.log('📦 MongoDB not available, using in-memory storage for demo');
-      
-      // Initialize in-memory database with admin user
-      memoryDB.connected = true;
-      memoryDB.users = [
-        {
-          _id: 'admin123',
-          id: 'admin123',
-          email: 'admin@admin.com',
-          password: '$2a$10$sGGOxuZHpMnE8DA97AvwnuRX0fqTFBAXYkeRQ1b/AAeyswRZf/d1G', // admin123
-          firstName: 'Admin',
-          lastName: 'User',
-          role: 'admin',
-          isActive: true,
-          balance: 100000,
-          stats: {
-            totalBets: 0,
-            wonBets: 0,
-            lostBets: 0,
-            pendingBets: 0,
-            totalWinnings: 0,
-            totalLosses: 0
-          },
-          createdAt: new Date(),
-          lastLogin: new Date()
-        }
-      ];
-      
-      console.log('✅ In-memory database initialized with admin user');
-    }
+    // Connect without authentication for local development
+    const mongoURI = process.env.MONGODB_URI || `mongodb://${mongoHost}:27017/betting_main`;
+    
+    console.log(`🔗 Connecting to MongoDB: ${mongoHost}:27017/betting_main`);
+    
+    await mongoose.connect(mongoURI, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+    });
+    
+    console.log(`🗄️  MongoDB Connected: ${mongoose.connection.host}`);
+    console.log(`📊 Database: ${mongoose.connection.name}`);
+    
   } catch (error) {
-    console.error('Database connection error:', error.message);
+    console.error('❌ MongoDB connection failed:', error.message);
+    console.error('Please ensure MongoDB is running and accessible');
     process.exit(1);
   }
 };
 
-// Export memory database for use in routes
-module.exports = { connectDB, memoryDB }; 
+module.exports = { connectDB }; 
