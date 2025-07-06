@@ -78,7 +78,7 @@ app.use(requestLogger);
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    service: 'Elite Betting Platform - Main Service',
+    service: 'Yami Betting Platform - Main Service',
     version: '1.0.0',
     description: 'Main authentication and user management service',
     endpoints: {

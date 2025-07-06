@@ -262,7 +262,7 @@ export default function ApiTestPage() {
             </div>
             <div>
               <h1 className="text-4xl font-bold">API Testing Interface</h1>
-              <p className="text-muted-foreground">Test Elite Betting Platform APIs in real-time</p>
+              <p className="text-muted-foreground">Test Yami Betting Platform APIs in real-time</p>
             </div>
           </div>
         </div>

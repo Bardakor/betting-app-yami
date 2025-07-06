@@ -1,8 +1,8 @@
-# Elite Betting Platform API Gateway
+# Yami Betting Platform API Gateway
 
 ## Overview
 
-The API Gateway serves as the central entry point for all microservices in the Elite Betting Platform. It provides:
+The API Gateway serves as the central entry point for all microservices in the Yami Betting Platform. It provides:
 
 - **Request Routing**: Routes requests to appropriate microservices
 - **Load Balancing**: Distributes load across service instances

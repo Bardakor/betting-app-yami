@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🛑 Stopping Elite Betting Platform..."
+echo "🛑 Stopping Yami Betting Platform..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -97,4 +97,4 @@ else
     echo -e "${BLUE}lsof -ti:[PORT] | xargs kill -9${NC}"
 fi
 
-echo -e "${GREEN}🎉 Elite Betting Platform stopped!${NC}"
+echo -e "${GREEN}🎉 Yami Betting Platform stopped!${NC}"

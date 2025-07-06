@@ -1,8 +1,8 @@
-# Google OAuth Setup Guide for Elite Betting Platform
+# Google OAuth Setup Guide for Yami Betting Platform
 
 ## 🚀 Quick Setup Instructions
 
-Follow these steps to enable Google OAuth in your Elite Betting Platform:
+Follow these steps to enable Google OAuth in your Yami Betting Platform:
 
 ### Step 1: Get Google OAuth Credentials
 
@@ -11,7 +11,7 @@ Follow these steps to enable Google OAuth in your Elite Betting Platform:
 3. **Create a new project** or select an existing one:
    - Click the project dropdown (next to Google Cloud logo)
    - Click "New Project"
-   - Name it "Elite Betting Platform"
+   - Name it "Yami Betting Platform"
    - Click "Create"
 
 ### Step 2: Enable APIs
@@ -26,7 +26,7 @@ Follow these steps to enable Google OAuth in your Elite Betting Platform:
 1. Go to **APIs & Services** → **OAuth consent screen**
 2. Select **External** (for public use)
 3. Fill in required fields:
-   - **App name**: "Elite Betting Platform"
+   - **App name**: "Yami Betting Platform"
    - **User support email**: Your email
    - **Developer contact information**: Your email
 4. Click **Save and Continue** through all steps
@@ -37,7 +37,7 @@ Follow these steps to enable Google OAuth in your Elite Betting Platform:
 2. Click **+ Create Credentials** → **OAuth client ID**
 3. Select **Web application**
 4. Configure:
-   - **Name**: "Elite Betting Platform Web Client"
+   - **Name**: "Yami Betting Platform Web Client"
    - **Authorized JavaScript origins**: 
      ```
      http://localhost:3000

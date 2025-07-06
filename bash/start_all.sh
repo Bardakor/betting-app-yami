@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Starting Elite Betting Platform..."
+echo "🚀 Starting Yami Betting Platform..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -181,8 +181,8 @@ if [ ! -f .env.local ]; then
     echo -e "${CYAN}Creating environment configuration...${NC}"
     cat > .env.local << EOF
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_APP_NAME="Elite Betting Platform"
-NEXT_PUBLIC_APP_DESCRIPTION="Elite betting platform with microservices architecture"
+NEXT_PUBLIC_APP_NAME="Yami Betting Platform"
+NEXT_PUBLIC_APP_DESCRIPTION="Yami betting platform with microservices architecture"
 EOF
     echo -e "${GREEN}Environment file created${NC}"
 fi
@@ -233,7 +233,7 @@ for i in {1..15}; do
 done
 
 echo ""
-echo -e "${GREEN}🎉 Elite Betting Platform is running!${NC}"
+echo -e "${GREEN}🎉 Yami Betting Platform is running!${NC}"
 echo ""
 echo -e "${PURPLE}═══════════════════════════════════════${NC}"
 echo -e "${PURPLE}           ACCESS POINTS${NC}"

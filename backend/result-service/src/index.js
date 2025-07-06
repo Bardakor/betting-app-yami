@@ -45,7 +45,7 @@ app.use(logger);
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    service: 'Elite Betting Platform - Result Service',
+    service: 'Yami Betting Platform - Result Service',
     version: '1.0.0',
     description: 'Match result evaluation and bet settlement service',
     endpoints: {

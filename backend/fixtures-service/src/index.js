@@ -143,7 +143,7 @@ app.delete('/cache/clear', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    service: 'Elite Betting Platform - Fixtures Service',
+    service: 'Yami Betting Platform - Fixtures Service',
     version: '1.0.0',
     description: 'Football fixtures data service powered by API-Football',
     endpoints: {

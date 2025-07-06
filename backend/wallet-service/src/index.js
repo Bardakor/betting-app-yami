@@ -43,7 +43,7 @@ app.use(logger);
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    service: 'Elite Betting Platform - Wallet Service',
+    service: 'Yami Betting Platform - Wallet Service',
     version: '1.0.0',
     description: 'User wallet and transaction management service',
     endpoints: {

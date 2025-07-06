@@ -75,7 +75,7 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    service: 'Elite Betting Platform - Odds Service',
+    service: 'Yami Betting Platform - Odds Service',
     version: '1.0.0',
     description: 'Dynamic odds calculation and management service',
     endpoints: {

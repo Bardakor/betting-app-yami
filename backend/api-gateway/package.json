@@ -1,7 +1,7 @@
 {
   "name": "api-gateway",
   "version": "1.0.0",
-  "description": "API Gateway for Elite Betting Platform - Routes and coordinates all microservices",
+  "description": "API Gateway for Yami Betting Platform - Routes and coordinates all microservices",
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon src/index.js",

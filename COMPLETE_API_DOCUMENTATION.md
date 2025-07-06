@@ -1,4 +1,4 @@
-# Elite Betting Platform - Complete API Documentation
+# Yami Betting Platform - Complete API Documentation
 
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
@@ -19,7 +19,7 @@
 
 ## Architecture Overview
 
-The Elite Betting Platform is built on a microservices architecture with 7 core services:
+The Yami Betting Platform is built on a microservices architecture with 7 core services:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐
@@ -1807,7 +1807,7 @@ Each service provides:
 ```env
 NODE_ENV=development
 PORT=3001
-MONGODB_URI=mongodb://localhost:27017/elite_betting
+MONGODB_URI=mongodb://localhost:27017/Yami_betting
 JWT_SECRET=your_jwt_secret_key
 FRONTEND_URL=http://localhost:3000
 ```
@@ -1858,4 +1858,4 @@ docker-compose logs -f bet-service
 
 ---
 
-This documentation provides a complete reference for the Elite Betting Platform API. Each endpoint includes examples, and the service interactions are clearly defined to help developers understand how to integrate with and extend the platform.
+This documentation provides a complete reference for the Yami Betting Platform API. Each endpoint includes examples, and the service interactions are clearly defined to help developers understand how to integrate with and extend the platform.

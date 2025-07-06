@@ -131,7 +131,7 @@ export default function DocumentationPage() {
             </div>
             <div>
               <h1 className="text-4xl font-bold">API Documentation</h1>
-              <p className="text-muted-foreground">Elite Betting Platform - Comprehensive API Reference</p>
+              <p className="text-muted-foreground">Yami Betting Platform - Comprehensive API Reference</p>
             </div>
           </div>
           
@@ -204,7 +204,7 @@ export default function DocumentationPage() {
                   Quick Start
                 </CardTitle>
                 <CardDescription>
-                  Get started with the Elite Betting Platform API
+                  Get started with the Yami Betting Platform API
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -302,7 +302,7 @@ export default function DocumentationPage() {
                   JWT Authentication Flow
                 </CardTitle>
                 <CardDescription>
-                  Learn how to authenticate with the Elite Betting Platform API
+                  Learn how to authenticate with the Yami Betting Platform API
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">

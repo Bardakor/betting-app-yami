@@ -1,4 +1,4 @@
-# Elite Betting Platform - Current Status
+# Yami Betting Platform - Current Status
 
 ## ✅ Recently Implemented
 
@@ -195,7 +195,7 @@ open http://localhost:8000/docs
 
 ### **Interactive Testing Tools**
 - ✅ **API Demo Page** - `api-demo.html` with working examples
-- ✅ **Postman Collection** - `Elite_Betting_Platform.postman_collection.json`
+- ✅ **Postman Collection** - `Yami_Betting_Platform.postman_collection.json`
 - ✅ **Health Checks** - All services monitored and accessible
 
 ### **External API Integration**

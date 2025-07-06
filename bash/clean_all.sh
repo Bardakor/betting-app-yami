@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🧹 Cleaning Elite Betting Platform..."
+echo "🧹 Cleaning Yami Betting Platform..."
 
 # Colors for output
 RED='\033[0;31m'

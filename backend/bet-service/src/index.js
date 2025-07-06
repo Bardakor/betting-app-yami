@@ -43,7 +43,7 @@ app.use(logger);
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    service: 'Elite Betting Platform - Bet Service',
+    service: 'Yami Betting Platform - Bet Service',
     version: '1.0.0',
     description: 'Betting management and processing service',
     endpoints: {
