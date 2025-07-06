@@ -7,7 +7,8 @@ const processFinishedMatches = async () => {
     console.log('🔍 Checking for finished matches...');
     
     // Get recently finished fixtures from fixtures service
-    const response = await axios.get(`${process.env.FIXTURES_SERVICE_URL}/api/fixtures/finished`);
+    const fixturesServiceUrl = process.env.FIXTURES_SERVICE_URL || 'http://localhost:3002';
+    const response = await axios.get(`${fixturesServiceUrl}/fixtures/finished`);
     
     if (!response.data.success || !response.data.fixtures) {
       console.log('📋 No finished matches found');

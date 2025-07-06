@@ -98,6 +98,22 @@ app.get('/', (req, res) => {
   });
 });
 
+// Handle POST requests to root (redirect to proper endpoint)
+app.post('/', (req, res) => {
+  res.status(400).json({
+    success: false,
+    message: 'POST requests to root not supported',
+    hint: 'Use specific endpoints like /auth/login or /auth/register',
+    availablePostEndpoints: [
+      'POST /auth/login',
+      'POST /auth/register', 
+      'POST /auth/google/callback',
+      'POST /auth/update-balance',
+      'POST /api/admin/create'
+    ]
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -139,4 +155,4 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully');
   process.exit(0);
-}); 
+});

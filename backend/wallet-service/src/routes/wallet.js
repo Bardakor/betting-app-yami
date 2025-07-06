@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const Transaction = require('../models/Transaction');
+const { memoryDB } = require('../config/database');
 
 const router = express.Router();
 
@@ -47,6 +48,25 @@ const verifyToken = async (req, res, next) => {
     });
   }
 };
+
+// Root route - show available endpoints
+router.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Wallet Service API',
+    service: 'wallet-service',
+    version: '1.0.0',
+    availableEndpoints: [
+      'GET /balance - Get user wallet balance (requires auth)',
+      'POST /deposit - Deposit funds (requires auth)',
+      'POST /withdraw - Withdraw funds (requires auth)',
+      'GET /transactions - Get transaction history (requires auth)',
+      'POST /internal/deduct - Internal bet deduction (service-to-service)',
+      'POST /internal/credit - Internal bet credit (service-to-service)'
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Get user balance
 router.get('/balance', verifyToken, async (req, res) => {
@@ -361,10 +381,10 @@ router.post('/process-bet', async (req, res) => {
   try {
     const { userId, amount, type, betId, fixtureId, description } = req.body;
 
-    if (!userId || !amount || !type || !betId) {
+    if (!userId || !amount || !type) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields'
+        message: 'Missing required fields: userId, amount, type'
       });
     }
 
@@ -379,11 +399,20 @@ router.post('/process-bet', async (req, res) => {
         });
       }
 
-      // Deduct amount
+      // Create a temporary admin token for internal service calls
+      // This is a service-to-service call, so we'll simulate admin access
+      const adminToken = 'service-internal-call';
+      
+      // Deduct amount using the admin endpoint
       const updateResponse = await axios.post(`${process.env.MAIN_SERVICE_URL}/auth/admin/update-user-balance`, {
         userId,
         amount,
         operation: 'subtract'
+      }, {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+          'X-Service-Auth': 'wallet-service-internal'
+        }
       });
 
       if (!updateResponse.data.success) {
@@ -408,7 +437,8 @@ router.post('/process-bet', async (req, res) => {
       return res.json({
         success: true,
         message: 'Bet amount deducted',
-        newBalance: updateResponse.data.newBalance
+        newBalance: updateResponse.data.newBalance,
+        transactionId: transaction._id || transaction.transactionId
       });
     }
 
@@ -418,6 +448,11 @@ router.post('/process-bet', async (req, res) => {
         userId,
         amount,
         operation: 'add'
+      }, {
+        headers: {
+          'Authorization': `Bearer service-internal-call`,
+          'X-Service-Auth': 'wallet-service-internal'
+        }
       });
 
       const transaction = new Transaction({
@@ -451,4 +486,43 @@ router.post('/process-bet', async (req, res) => {
   }
 });
 
-module.exports = router; 
+// Update transaction with bet ID (called by bet service)
+router.put('/transaction/:transactionId', async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const { betId } = req.body;
+
+    if (mongoose.connection.readyState === 1) {
+      // MongoDB is connected
+      const transaction = await Transaction.findOneAndUpdate(
+        { transactionId: transactionId },
+        { $set: { 'metadata.betId': betId } },
+        { new: true }
+      );
+      
+      if (transaction) {
+        return res.json({ success: true, message: 'Transaction updated' });
+      }
+    } else {
+      // In-memory storage
+      const transaction = memoryDB.transactions.find(t => t.transactionId === transactionId);
+      if (transaction) {
+        transaction.metadata.betId = betId;
+        return res.json({ success: true, message: 'Transaction updated' });
+      }
+    }
+
+    res.status(404).json({
+      success: false,
+      message: 'Transaction not found'
+    });
+  } catch (error) {
+    console.error('Update transaction error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating transaction'
+    });
+  }
+});
+
+module.exports = router;

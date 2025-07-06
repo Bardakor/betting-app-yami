@@ -553,6 +553,85 @@ router.get('/live', (req, res) => {
   res.redirect('/fixtures/live-now');
 });
 
+// Get finished fixtures for result processing
+router.get('/finished', apiLimiter, async (req, res) => {
+  logApi('🏁 [FIXTURES] GET /finished');
+  
+  try {
+    // Look for recently finished matches (within last 2 hours)
+    const twoHoursAgo = new Date();
+    twoHoursAgo.setHours(twoHoursAgo.getHours() - 2);
+    
+    const dateFrom = twoHoursAgo.toISOString().split('T')[0];
+    const dateTo = new Date().toISOString().split('T')[0];
+    
+    const cacheKey = `finished_fixtures_${dateFrom}_${dateTo}`;
+    const cached = cache.get(cacheKey);
+    
+    if (cached) {
+      logApi('🟢 [FIXTURES] GET /finished - FROM CACHE');
+      return res.json({
+        success: true,
+        fixtures: cached,
+        fromCache: true,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const response = await axios.get(`${BASE_URL}/fixtures`, {
+      headers: apiHeaders,
+      params: {
+        status: 'FT', // Full time
+        from: dateFrom,
+        to: dateTo,
+        timezone: 'UTC'
+      }
+    });
+
+    if (response.data.errors && response.data.errors.length > 0) {
+      console.error('API Error:', response.data.errors);
+      return res.status(500).json({
+        success: false,
+        message: 'API error occurred',
+        errors: response.data.errors
+      });
+    }
+
+    const fixtures = response.data.response || [];
+    
+    // Filter for recently finished matches only
+    const recentlyFinished = fixtures.filter(fixture => {
+      const fixtureDate = new Date(fixture.fixture.date);
+      const timeSinceEnd = Date.now() - fixtureDate.getTime();
+      // Only include matches finished within last 2 hours
+      return timeSinceEnd <= 2 * 60 * 60 * 1000;
+    });
+
+    // Cache for 10 minutes
+    cache.set(cacheKey, recentlyFinished, 10 * 60);
+
+    logApi(`🟢 [FIXTURES] GET /finished - ${recentlyFinished.length} fixtures found`);
+    
+    res.json({
+      success: true,
+      fixtures: recentlyFinished,
+      count: recentlyFinished.length,
+      fromCache: false,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Finished fixtures fetch error:', error.message);
+    logApi('🔴 [FIXTURES] GET /finished - ERROR');
+    
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching finished fixtures',
+      error: error.message
+    });
+  }
+});
+
 // Single fixture by ID with statistical odds
 router.get('/:id', apiLimiter, async (req, res) => {
   logApi(`🏈 [FIXTURES] GET /${req.params.id}`);
@@ -658,4 +737,4 @@ router.get('/teams/search', apiLimiter, async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

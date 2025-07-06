@@ -40,7 +40,16 @@ const limiter = rateLimit({
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    process.env.MAIN_SERVICE_URL || 'http://localhost:3001',
+    'http://localhost:8000' // API Gateway
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(limiter);
 app.use(express.json());
 app.use(requestLogger);

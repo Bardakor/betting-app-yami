@@ -4,6 +4,25 @@ const Bet = require('../models/Bet');
 
 const router = express.Router();
 
+// Root route - show available endpoints
+router.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Bet Service API',
+    service: 'bet-service',
+    version: '1.0.0',
+    availableEndpoints: [
+      'POST /place - Place a new bet (requires auth)',
+      'GET /my - Get user\'s bets (requires auth)',
+      'GET /:betId - Get specific bet details (requires auth)',
+      'GET /stats/summary - Get betting statistics (requires auth)',
+      'GET /admin/all - Get all bets (admin only)',
+      'POST /settle - Settle finished bets (admin only)'
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Middleware to verify JWT token with main service
 const verifyToken = async (req, res, next) => {
   try {
@@ -84,12 +103,15 @@ router.post('/place', verifyToken, async (req, res) => {
 
     const fixture = fixtureResponse.data.fixture;
 
-    // Check if match has already started
+    // Check if match has already started for non-live betting
     const kickoffTime = new Date(fixture.fixture.date);
-    if (kickoffTime <= new Date()) {
+    const matchStatus = fixture.fixture.status.short;
+    
+    // Allow betting on live matches but not finished ones
+    if (['FT', 'AET', 'PEN', 'CANC', 'ABD', 'AWD', 'WO'].includes(matchStatus)) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot bet on matches that have already started'
+        message: 'Cannot bet on finished matches'
       });
     }
 
@@ -132,7 +154,7 @@ router.post('/place', verifyToken, async (req, res) => {
       userId: req.user.id,
       amount: stake,
       type: 'bet_placed',
-      betId: null, // Will be updated after bet creation
+      betId: 'temp', // Will be updated after bet creation
       fixtureId,
       description: `Bet placed: ${fixture.teams.home.name} vs ${fixture.teams.away.name}`
     });
@@ -505,4 +527,4 @@ router.post('/settle/:fixtureId', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;
