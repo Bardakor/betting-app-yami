@@ -48,12 +48,12 @@ const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: process.env.API_TITLE || 'Yami Betting Platform API',
+      title: process.env.API_TITLE || 'Elite Betting Platform API',
       version: process.env.API_VERSION || '1.0.0',
-      description: 'Comprehensive API Gateway for Yami Betting Platform microservices. This API provides access to all betting platform functionality including user authentication, fixture data, odds calculation, wallet management, bet placement, and result processing.',
+      description: 'Comprehensive API Gateway for Elite Betting Platform microservices. This API provides access to all betting platform functionality including user authentication, fixture data, odds calculation, wallet management, bet placement, and result processing.',
       contact: {
-        name: 'Yami Betting Platform',
-        email: 'api@Yamibetting.com'
+        name: 'Elite Betting Platform',
+        email: 'api@elitebetting.com'
       },
       license: {
         name: 'MIT',
@@ -66,7 +66,7 @@ const swaggerOptions = {
         description: 'Development server'
       },
       {
-        url: 'https://api.Yamibetting.com',
+        url: 'https://api.elitebetting.com',
         description: 'Production server'
       }
     ],
@@ -392,7 +392,7 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Yami Betting Platform API Gateway is running!"
+ *                   example: "Elite Betting Platform API Gateway is running!"
  *                 timestamp:
  *                   type: string
  *                   format: date-time
@@ -441,7 +441,7 @@ app.get('/health/services', async (req, res) => {
 // API Testing endpoint
 app.get('/test', (req, res) => {
   res.json({
-    message: 'Yami Betting Platform API Gateway is running!',
+    message: 'Elite Betting Platform API Gateway is running!',
     timestamp: new Date().toISOString(),
     availableServices: Object.keys(services),
     endpoints: {
