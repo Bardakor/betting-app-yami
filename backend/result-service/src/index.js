@@ -41,6 +41,33 @@ app.use(express.urlencoded({ extended: true }));
 // Logging middleware
 app.use(logger);
 
+// Root endpoint with service info
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    service: 'Elite Betting Platform - Result Service',
+    version: '1.0.0',
+    description: 'Match result evaluation and bet settlement service',
+    endpoints: {
+      'GET /health': 'Service health check',
+      'POST /api/results/evaluate': 'Evaluate match results',
+      'GET /api/results': 'Get all results',
+      'GET /api/results/:fixtureId': 'Get result for specific fixture',
+      'POST /api/results/settle': 'Settle bets for finished matches',
+      'GET /api/results/stats': 'Get result processing statistics'
+    },
+    features: [
+      'Automatic result evaluation',
+      'Bet settlement processing',
+      'Scheduled result checking',
+      'Result validation and verification'
+    ],
+    automation: 'Runs every 5 minutes to check finished matches',
+    database: 'MongoDB with Result tracking',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/api/results', resultRoutes);
 

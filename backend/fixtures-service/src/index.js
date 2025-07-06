@@ -139,6 +139,45 @@ app.delete('/cache/clear', (req, res) => {
   });
 });
 
+// Root endpoint with service info
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    service: 'Elite Betting Platform - Fixtures Service',
+    version: '1.0.0',
+    description: 'Football fixtures data service powered by API-Football',
+    endpoints: {
+      'GET /health': 'Service health check',
+      'GET /health/api': 'External API connectivity check',
+      'GET /cache/stats': 'Cache statistics',
+      'DELETE /cache/clear': 'Clear cache',
+      'GET /fixtures/live': 'Get live fixtures',
+      'GET /fixtures': 'Get fixtures with filters',
+      'GET /fixtures/:id': 'Get specific fixture',
+      'GET /fixtures/:id/events': 'Get fixture events',
+      'GET /fixtures/:id/lineups': 'Get fixture lineups',
+      'GET /fixtures/:id/statistics': 'Get fixture statistics',
+      'GET /docs': 'API documentation'
+    },
+    features: [
+      'Live fixtures tracking',
+      'Historical fixture data',
+      'Fixture events and statistics',
+      'Team lineups',
+      'Real-time updates'
+    ],
+    rateLimit: '200 requests per 15 minutes',
+    cache: 'Enabled with 5 minute TTL',
+    dataSource: 'API-Football',
+    cache_stats: {
+      keys: cache.keys().length,
+      hits: cache.getStats().hits,
+      misses: cache.getStats().misses
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/fixtures', fixturesRoutes);
 

@@ -59,6 +59,39 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Root endpoint with service info
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    service: 'Elite Betting Platform - Odds Service',
+    version: '1.0.0',
+    description: 'Dynamic odds calculation and management service',
+    endpoints: {
+      'GET /health': 'Service health check',
+      'GET /odds': 'Get all odds',
+      'GET /odds/:fixtureId': 'Get odds for specific fixture',
+      'POST /odds/calculate': 'Calculate odds for fixture',
+      'POST /odds/update': 'Update odds for fixture',
+      'GET /odds/live': 'Get live odds updates',
+      'GET /cache/stats': 'Cache statistics',
+      'DELETE /cache/clear': 'Clear cache'
+    },
+    features: [
+      'Real-time odds calculation',
+      'SQLite database storage',
+      'In-memory caching',
+      'Live odds updates'
+    ],
+    database: 'SQLite with 10-minute cache TTL',
+    cache_stats: {
+      keys: req.app.locals.cache.keys().length,
+      hits: req.app.locals.cache.getStats().hits,
+      misses: req.app.locals.cache.getStats().misses
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/', oddsRoutes);
 

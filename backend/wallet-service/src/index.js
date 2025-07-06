@@ -39,6 +39,34 @@ app.use(express.urlencoded({ extended: true }));
 // Logging middleware
 app.use(logger);
 
+// Root endpoint with service info
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    service: 'Elite Betting Platform - Wallet Service',
+    version: '1.0.0',
+    description: 'User wallet and transaction management service',
+    endpoints: {
+      'GET /health': 'Service health check',
+      'GET /api/wallet/:userId/balance': 'Get user balance',
+      'POST /api/wallet/:userId/deposit': 'Deposit funds',
+      'POST /api/wallet/:userId/withdraw': 'Withdraw funds',
+      'GET /api/wallet/:userId/transactions': 'Get transaction history',
+      'POST /api/wallet/:userId/transfer': 'Transfer funds between users',
+      'GET /api/wallet/:userId/stats': 'Get wallet statistics'
+    },
+    features: [
+      'Balance management',
+      'Transaction processing',
+      'Transaction history',
+      'Fund transfers',
+      'Wallet statistics'
+    ],
+    database: 'MongoDB with Transaction logging',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/api/wallet', walletRoutes);
 

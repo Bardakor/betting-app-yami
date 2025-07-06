@@ -39,6 +39,34 @@ app.use(express.urlencoded({ extended: true }));
 // Logging middleware
 app.use(logger);
 
+// Root endpoint with service info
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    service: 'Elite Betting Platform - Bet Service',
+    version: '1.0.0',
+    description: 'Betting management and processing service',
+    endpoints: {
+      'GET /health': 'Service health check',
+      'POST /api/bets': 'Place a new bet',
+      'GET /api/bets': 'Get all bets (with filters)',
+      'GET /api/bets/:id': 'Get specific bet',
+      'PUT /api/bets/:id': 'Update bet status',
+      'DELETE /api/bets/:id': 'Cancel/delete bet',
+      'GET /api/bets/user/:userId': 'Get user bets',
+      'GET /api/bets/fixture/:fixtureId': 'Get bets for fixture'
+    },
+    features: [
+      'Bet placement and management',
+      'User bet tracking',
+      'Fixture-based betting',
+      'Real-time bet processing'
+    ],
+    database: 'MongoDB with Mongoose ODM',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/api/bets', betRoutes);
 

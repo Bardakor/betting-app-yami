@@ -74,6 +74,30 @@ app.use(session({
 // Logging middleware
 app.use(requestLogger);
 
+// Root endpoint with service info
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    service: 'Elite Betting Platform - Main Service',
+    version: '1.0.0',
+    description: 'Main authentication and user management service',
+    endpoints: {
+      'GET /health': 'Service health check',
+      'POST /auth/login': 'User login',
+      'POST /auth/register': 'User registration',
+      'POST /auth/google/callback': 'Google OAuth callback',
+      'GET /auth/profile': 'Get user profile',
+      'GET /auth/verify-token': 'Verify JWT token',
+      'POST /auth/update-balance': 'Update user balance',
+      'GET /api/users': 'Get all users (admin)',
+      'POST /api/admin/create': 'Create admin user',
+      'GET /api/stats': 'Get platform statistics'
+    },
+    documentation: 'See API_DOCUMENTATION.md for detailed usage',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
