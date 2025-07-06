@@ -37,6 +37,13 @@ export function Header() {
     }
   }, [user]);
 
+  // Also update balance when user data changes (after placing bets)
+  useEffect(() => {
+    if (user?.balance !== undefined) {
+      setBalance(user.balance);
+    }
+  }, [user?.balance]);
+
   const fetchBalance = async () => {
     try {
       const response = await authService.getBalance();

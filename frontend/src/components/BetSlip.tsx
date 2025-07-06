@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { authService } from '@/lib/auth';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface BetSlipItem {
   id: string;
@@ -32,6 +33,7 @@ interface BetSlipProps {
 export function BetSlip({ isOpen, onClose, items, onRemoveItem, onClearAll }: BetSlipProps) {
   const [stakes, setStakes] = useState<{ [key: string]: string }>({});
   const [isPlacing, setIsPlacing] = useState(false);
+  const { refreshUser } = useAuth();
 
   if (!isOpen) return null;
 
@@ -90,6 +92,9 @@ export function BetSlip({ isOpen, onClose, items, onRemoveItem, onClearAll }: Be
           delete newStakes[item.id];
           return newStakes;
         });
+        
+        // Refresh user data to update balance
+        await refreshUser();
       } else {
         toast.error(response.message || 'Failed to place bet');
       }
@@ -145,6 +150,9 @@ export function BetSlip({ isOpen, onClose, items, onRemoveItem, onClearAll }: Be
     if (successCount > 0) {
       toast.success(`Successfully placed ${successCount} bet${successCount > 1 ? 's' : ''}`);
       setStakes({});
+      
+      // Refresh user data to update balance
+      await refreshUser();
     }
 
     if (failCount > 0) {

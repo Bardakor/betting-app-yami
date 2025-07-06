@@ -14,12 +14,14 @@ import {
   TrendingUp,
   ChevronLeft,
   BookOpen,
-  Zap
+  Zap,
+  DollarSign
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Live Matches', href: '/live-matches', icon: Play },
+  { name: 'My Bets', href: '/bets', icon: DollarSign },
   { name: 'API Docs', href: '/docs', icon: BookOpen },
   { name: 'API Test', href: '/api-test', icon: Zap },
   { name: 'Profile', href: '/profile', icon: User },

@@ -32,6 +32,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/contexts/AuthContext';
+import { authService } from '@/lib/auth';
+import { toast } from 'sonner';
 
 // Default user profile structure - will be populated from API
 const defaultUserProfile = {
@@ -52,6 +55,7 @@ const defaultUserProfile = {
 };
 
 export default function Profile() {
+  const { user, refreshUser } = useAuth();
   const [showBalance, setShowBalance] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState(defaultUserProfile);
@@ -59,32 +63,84 @@ export default function Profile() {
   const [achievements, setAchievements] = useState<any[]>([]);
   const [monthlyStats, setMonthlyStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bettingStats, setBettingStats] = useState<any>(null);
 
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        // TODO: Implement API calls to fetch real user data
-        // const profileResponse = await fetch('http://localhost:3001/api/user/profile');
-        // const betsResponse = await fetch('http://localhost:3001/api/user/bets');
-        // const achievementsResponse = await fetch('http://localhost:3001/api/user/achievements');
-        // const statsResponse = await fetch('http://localhost:3001/api/user/stats');
+        setLoading(true);
         
-        // For now, set empty data since we removed mock data
-        setRecentBets([]);
+        // Update profile data from user
+        if (user) {
+          setProfileData({
+            name: user.fullName || `${user.firstName} ${user.lastName}`,
+            username: `@${user.email.split('@')[0]}`,
+            email: user.email,
+            joinDate: new Date().toISOString().split('T')[0],
+            avatar: '',
+            badge: user.balance > 10000 ? 'Gold' : user.balance > 5000 ? 'Silver' : 'Bronze',
+            rank: Math.floor(Math.random() * 1000) + 1,
+            totalProfit: 0,
+            totalBets: user.stats?.totalBets || 0,
+            winRate: user.stats?.totalBets > 0 
+              ? Math.round((user.stats.wonBets / user.stats.totalBets) * 100) 
+              : 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            balance: user.balance,
+            verified: true
+          });
+        }
+        
+        // Fetch betting stats
+        const statsResponse = await authService.getBettingStats();
+        if (statsResponse.success) {
+          setBettingStats(statsResponse.stats);
+          
+          // Update profile data with real stats
+          setProfileData(prev => ({
+            ...prev,
+            totalBets: statsResponse.stats.totalBets || 0,
+            winRate: statsResponse.stats.winRate || 0,
+            totalProfit: statsResponse.stats.totalProfit || 0,
+            currentStreak: statsResponse.stats.currentStreak || 0,
+            longestStreak: statsResponse.stats.longestWinStreak || 0
+          }));
+        }
+        
+        // Fetch recent bets
+        const betsResponse = await authService.getUserBets(1, 10);
+        if (betsResponse.success) {
+          setRecentBets(betsResponse.bets.map((bet: any) => ({
+            id: bet.id,
+            match: `${bet.matchInfo.homeTeam.name} vs ${bet.matchInfo.awayTeam.name}`,
+            market: bet.betType.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+            selection: bet.selection,
+            odds: bet.odds,
+            stake: bet.stake,
+            date: new Date(bet.placedAt).toLocaleDateString(),
+            result: bet.status,
+            profit: bet.status === 'won' 
+              ? bet.potentialWin - bet.stake 
+              : bet.status === 'lost' 
+              ? -bet.stake 
+              : 0
+          })));
+        }
+        
+        // Placeholder data for achievements and monthly stats
         setAchievements([]);
         setMonthlyStats([]);
       } catch (error) {
         console.error('Error fetching profile data:', error);
-        setRecentBets([]);
-        setAchievements([]);
-        setMonthlyStats([]);
+        toast.error('Failed to load profile data');
       } finally {
         setLoading(false);
       }
     };
 
     fetchProfileData();
-  }, []);
+  }, [user]);
 
   return (
     <motion.div
