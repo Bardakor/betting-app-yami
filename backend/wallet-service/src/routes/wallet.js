@@ -495,6 +495,7 @@ router.post('/process-bet', async (req, res) => {
           userId,
           type: 'bet_placed',
           amount,
+          balanceAfter: updateResponse.data.newBalance,
           description: description || `Bet placed on fixture ${fixtureId}`,
           status: 'completed'
         });
@@ -551,6 +552,7 @@ router.post('/process-bet', async (req, res) => {
           userId,
           type: 'bet_won',
           amount,
+          balanceAfter: updateResponse.data.newBalance,
           description: description || `Bet won on fixture ${fixtureId}`,
           status: 'completed'
         });
@@ -606,6 +608,7 @@ router.post('/process-bet', async (req, res) => {
           userId,
           type: 'bet_refund',
           amount,
+          balanceAfter: updateResponse.data.newBalance,
           description: description || `Bet refunded for fixture ${fixtureId}`,
           status: 'completed'
         });

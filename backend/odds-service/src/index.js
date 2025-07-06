@@ -22,20 +22,17 @@ app.locals.cache = cache;
 // Initialize MongoDB database
 const initDB = async () => {
   try {
-    // Force in-memory for demo
-    process.env.FORCE_MEMORY_DB = 'true';
     const isConnected = await initDatabase();
     if (isConnected) {
       console.log('📊 MongoDB database initialized');
-    } else {
-      console.log('📊 Using in-memory database for demo');
     }
   } catch (error) {
     console.error('Database initialization failed:', error);
-    console.log('📊 Falling back to in-memory database');
+    process.exit(1);
   }
 };
 
+// Remove forced in-memory flag and immediately attempt to connect
 initDB();
 
 // Rate limiting

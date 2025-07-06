@@ -103,27 +103,30 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
+    // Build Google OAuth URL for client-side flow
     const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     
     if (!googleClientId || googleClientId === 'your-actual-google-client-id-from-google-cloud-console') {
-      toast.error('Google OAuth Not Configured - Please configure NEXT_PUBLIC_GOOGLE_CLIENT_ID in your environment file');
+      toast.error('Google OAuth is not configured. Please contact administrator.');
       return;
     }
-
-    const redirectUri = `${window.location.origin}/auth/callback`;
-    const scope = 'openid profile email';
-    const responseType = 'code';
-    const state = Math.random().toString(36).substring(7);
     
-    // Store state for security
+    const redirectUri = `${window.location.origin}/auth/callback`;
+    const scope = 'openid email profile';
+    const responseType = 'code';
+    const state = Math.random().toString(36).substring(7); // Simple state for CSRF protection
+    
+    // Store state in sessionStorage for verification
     sessionStorage.setItem('oauth_state', state);
     
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${googleClientId}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `scope=${encodeURIComponent(scope)}&` +
       `response_type=${responseType}&` +
-      `state=${state}`;
+      `scope=${encodeURIComponent(scope)}&` +
+      `state=${state}&` +
+      `access_type=offline&` +
+      `prompt=consent`;
     
     window.location.href = googleAuthUrl;
   };
@@ -375,4 +378,4 @@ export default function LoginPage() {
       </div>
     </div>
   );
-} console.log("GOOGLE_CLIENT_ID:", process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
+}

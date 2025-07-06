@@ -9,10 +9,12 @@ const BASE_URL = 'https://v3.football.api-sports.io';
 const FBREF_BASE_URL = 'https://fbref.com';
 const API_KEY = process.env.API_FOOTBALL_KEY;
 
-// API headers
+// Build headers that work for BOTH the direct API-Football endpoint and RapidAPI proxy
 const apiHeaders = {
-  'X-RapidAPI-Key': API_KEY,
-  'X-RapidAPI-Host': 'v3.football.api-sports.io'
+  'X-RapidAPI-Key': API_KEY,           // <— used when hitting RapidAPI host
+  'X-RapidAPI-Host': process.env.RAPIDAPI_HOST || 'v3.football.api-sports.io',
+  // Direct (non-RapidAPI) header expected by api-sports.io
+  'x-apisports-key': API_KEY
 };
 
 // Cache for 5 minutes for live matches, 30 minutes for others
@@ -317,6 +319,16 @@ async function makeApiCall(endpoint, params = {}) {
       timeout: 10000
     });
 
+    // API-Football returns { errors: { requests: "..." } } when quota reached.
+    if (response.data?.errors && Object.keys(response.data.errors).length > 0) {
+      const firstError = Object.values(response.data.errors)[0];
+      return {
+        success: false,
+        error: firstError,
+        status: 429
+      };
+    }
+
     return {
       success: true,
       data: response.data,
@@ -349,11 +361,163 @@ router.get('/live-now', apiLimiter, async (req, res) => {
     const result = await makeApiCall('/fixtures', { live: 'all' });
     
     if (!result.success) {
-      return res.status(result.status || 500).json({
-        success: false,
-        message: 'Failed to fetch live matches',
-        error: result.error
-      });
+      // Return placeholder live data when API is unavailable
+      logApi('⚠️  API unavailable, returning placeholder live fixtures');
+      
+      const placeholderLiveFixtures = [
+        {
+          fixture: {
+            id: 2001,
+            referee: "Anthony Taylor",
+            timezone: "UTC",
+            date: new Date(Date.now() - 3000000).toISOString(), // Started 50 mins ago
+            timestamp: Date.now() - 3000000,
+            periods: { first: 1630000000, second: null },
+            venue: { id: 494, name: "Emirates Stadium", city: "London" },
+            status: { long: "Second Half", short: "2H", elapsed: 65 }
+          },
+          league: {
+            id: 39,
+            name: "Premier League",
+            country: "England",
+            logo: "https://media.api-sports.io/football/leagues/39.png",
+            flag: "https://media.api-sports.io/flags/gb.svg",
+            season: 2025,
+            round: "Regular Season - 20"
+          },
+          teams: {
+            home: {
+              id: 42,
+              name: "Arsenal",
+              logo: "https://media.api-sports.io/football/teams/42.png",
+              winner: true
+            },
+            away: {
+              id: 49,
+              name: "Chelsea",
+              logo: "https://media.api-sports.io/football/teams/49.png",
+              winner: false
+            }
+          },
+          goals: { home: 2, away: 1 },
+          score: {
+            halftime: { home: 1, away: 0 },
+            fulltime: { home: null, away: null },
+            extratime: { home: null, away: null },
+            penalty: { home: null, away: null }
+          },
+          events: [
+            {
+              time: { elapsed: 15, extra: null },
+              team: { id: 42, name: "Arsenal", logo: "https://media.api-sports.io/football/teams/42.png" },
+              player: { id: 1460, name: "B. Saka" },
+              assist: { id: 1461, name: "M. Odegaard" },
+              type: "Goal",
+              detail: "Normal Goal",
+              comments: null
+            },
+            {
+              time: { elapsed: 38, extra: null },
+              team: { id: 49, name: "Chelsea", logo: "https://media.api-sports.io/football/teams/49.png" },
+              player: { id: 1462, name: "C. Palmer" },
+              assist: { id: null, name: null },
+              type: "Goal",
+              detail: "Penalty",
+              comments: null
+            },
+            {
+              time: { elapsed: 52, extra: null },
+              team: { id: 42, name: "Arsenal", logo: "https://media.api-sports.io/football/teams/42.png" },
+              player: { id: 1463, name: "G. Jesus" },
+              assist: { id: 1464, name: "K. Havertz" },
+              type: "Goal",
+              detail: "Normal Goal",
+              comments: null
+            }
+          ]
+        },
+        {
+          fixture: {
+            id: 2002,
+            referee: "Daniele Orsato",
+            timezone: "UTC",
+            date: new Date(Date.now() - 1200000).toISOString(), // Started 20 mins ago
+            timestamp: Date.now() - 1200000,
+            periods: { first: null, second: null },
+            venue: { id: 909, name: "Stadio Giuseppe Meazza", city: "Milano" },
+            status: { long: "First Half", short: "1H", elapsed: 20 }
+          },
+          league: {
+            id: 135,
+            name: "Serie A",
+            country: "Italy",
+            logo: "https://media.api-sports.io/football/leagues/135.png",
+            flag: "https://media.api-sports.io/flags/it.svg",
+            season: 2025,
+            round: "Regular Season - 16"
+          },
+          teams: {
+            home: {
+              id: 505,
+              name: "Inter",
+              logo: "https://media.api-sports.io/football/teams/505.png",
+              winner: null
+            },
+            away: {
+              id: 489,
+              name: "AC Milan",
+              logo: "https://media.api-sports.io/football/teams/489.png",
+              winner: null
+            }
+          },
+          goals: { home: 0, away: 0 },
+          score: {
+            halftime: { home: null, away: null },
+            fulltime: { home: null, away: null },
+            extratime: { home: null, away: null },
+            penalty: { home: null, away: null }
+          },
+          events: []
+        }
+      ];
+      
+      // Add statistical odds to placeholder fixtures
+      const fixturesWithOdds = await Promise.all(
+        placeholderLiveFixtures.map(async (fixture) => {
+          const homeTeam = fixture.teams?.home?.name;
+          const awayTeam = fixture.teams?.away?.name;
+          const league = fixture.league?.name;
+          
+          if (homeTeam && awayTeam) {
+            const odds = await calculateStatisticalOdds(homeTeam, awayTeam, league);
+            return {
+              ...fixture,
+              calculatedOdds: odds
+            };
+          }
+          
+          return fixture;
+        })
+      );
+      
+      const groupedFixtures = groupByCompetition(fixturesWithOdds);
+      
+      const placeholderData = {
+        success: true,
+        count: fixturesWithOdds.length,
+        fixtures: fixturesWithOdds,
+        groupedByCompetition: groupedFixtures,
+        sortedByImportance: true,
+        oddsCalculation: 'statistical',
+        timestamp: new Date().toISOString(),
+        isPlaceholder: true,
+        message: 'Using placeholder live data due to API rate limit'
+      };
+      
+      // Cache placeholder data for very short duration
+      cache.set(cacheKey, placeholderData, 2 * 60); // 2 minutes for live data
+      
+      return res.json(placeholderData);
     }
 
     let fixtures = result.data.response || [];
@@ -425,11 +589,175 @@ router.get('/today', apiLimiter, async (req, res) => {
     const result = await makeApiCall('/fixtures', { date: today });
     
     if (!result.success) {
-      return res.status(result.status || 500).json({
-        success: false,
-        message: 'Failed to fetch today\'s matches',
-        error: result.error
-      });
+      // Return placeholder data when API is unavailable
+      logApi('⚠️  API unavailable, returning placeholder fixtures');
+      
+      const placeholderFixtures = [
+        {
+          fixture: {
+            id: 1001,
+            referee: "Michael Oliver",
+            timezone: "UTC",
+            date: new Date(Date.now() + 3600000).toISOString(),
+            timestamp: Date.now() + 3600000,
+            periods: { first: null, second: null },
+            venue: { id: 556, name: "Old Trafford", city: "Manchester" },
+            status: { long: "Not Started", short: "NS", elapsed: null }
+          },
+          league: {
+            id: 39,
+            name: "Premier League",
+            country: "England",
+            logo: "https://media.api-sports.io/football/leagues/39.png",
+            flag: "https://media.api-sports.io/flags/gb.svg",
+            season: 2025,
+            round: "Regular Season - 20"
+          },
+          teams: {
+            home: {
+              id: 33,
+              name: "Manchester United",
+              logo: "https://media.api-sports.io/football/teams/33.png",
+              winner: null
+            },
+            away: {
+              id: 40,
+              name: "Liverpool",
+              logo: "https://media.api-sports.io/football/teams/40.png",
+              winner: null
+            }
+          },
+          goals: { home: null, away: null },
+          score: {
+            halftime: { home: null, away: null },
+            fulltime: { home: null, away: null },
+            extratime: { home: null, away: null },
+            penalty: { home: null, away: null }
+          }
+        },
+        {
+          fixture: {
+            id: 1002,
+            referee: "Antonio Mateu",
+            timezone: "UTC",
+            date: new Date(Date.now() + 7200000).toISOString(),
+            timestamp: Date.now() + 7200000,
+            periods: { first: null, second: null },
+            venue: { id: 1456, name: "Santiago Bernabéu", city: "Madrid" },
+            status: { long: "Not Started", short: "NS", elapsed: null }
+          },
+          league: {
+            id: 140,
+            name: "La Liga",
+            country: "Spain",
+            logo: "https://media.api-sports.io/football/leagues/140.png",
+            flag: "https://media.api-sports.io/flags/es.svg",
+            season: 2025,
+            round: "Regular Season - 18"
+          },
+          teams: {
+            home: {
+              id: 541,
+              name: "Real Madrid",
+              logo: "https://media.api-sports.io/football/teams/541.png",
+              winner: null
+            },
+            away: {
+              id: 529,
+              name: "Barcelona",
+              logo: "https://media.api-sports.io/football/teams/529.png",
+              winner: null
+            }
+          },
+          goals: { home: null, away: null },
+          score: {
+            halftime: { home: null, away: null },
+            fulltime: { home: null, away: null },
+            extratime: { home: null, away: null },
+            penalty: { home: null, away: null }
+          }
+        },
+        {
+          fixture: {
+            id: 1003,
+            referee: "Felix Zwayer",
+            timezone: "UTC",
+            date: new Date(Date.now() + 10800000).toISOString(),
+            timestamp: Date.now() + 10800000,
+            periods: { first: null, second: null },
+            venue: { id: 700, name: "Allianz Arena", city: "München" },
+            status: { long: "Not Started", short: "NS", elapsed: null }
+          },
+          league: {
+            id: 78,
+            name: "Bundesliga",
+            country: "Germany",
+            logo: "https://media.api-sports.io/football/leagues/78.png",
+            flag: "https://media.api-sports.io/flags/de.svg",
+            season: 2025,
+            round: "Regular Season - 15"
+          },
+          teams: {
+            home: {
+              id: 157,
+              name: "Bayern Munich",
+              logo: "https://media.api-sports.io/football/teams/157.png",
+              winner: null
+            },
+            away: {
+              id: 165,
+              name: "Borussia Dortmund",
+              logo: "https://media.api-sports.io/football/teams/165.png",
+              winner: null
+            }
+          },
+          goals: { home: null, away: null },
+          score: {
+            halftime: { home: null, away: null },
+            fulltime: { home: null, away: null },
+            extratime: { home: null, away: null },
+            penalty: { home: null, away: null }
+          }
+        }
+      ];
+      
+      // Add statistical odds to placeholder fixtures
+      const fixturesWithOdds = await Promise.all(
+        placeholderFixtures.map(async (fixture) => {
+          const homeTeam = fixture.teams?.home?.name;
+          const awayTeam = fixture.teams?.away?.name;
+          const league = fixture.league?.name;
+          
+          if (homeTeam && awayTeam) {
+            const odds = await calculateStatisticalOdds(homeTeam, awayTeam, league);
+            return {
+              ...fixture,
+              calculatedOdds: odds
+            };
+          }
+          
+          return fixture;
+        })
+      );
+      
+      const groupedFixtures = groupByCompetition(fixturesWithOdds);
+      
+      const placeholderData = {
+        success: true,
+        date: today,
+        count: fixturesWithOdds.length,
+        fixtures: fixturesWithOdds,
+        groupedByCompetition: groupedFixtures,
+        sortedByImportance: true,
+        oddsCalculation: 'statistical',
+        isPlaceholder: true,
+        message: 'Using placeholder data due to API rate limit'
+      };
+      
+      // Cache placeholder data for shorter duration
+      cache.set(cacheKey, placeholderData, 5 * 60); // 5 minutes
+      
+      return res.json(placeholderData);
     }
 
     let fixtures = result.data.response || [];

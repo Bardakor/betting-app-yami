@@ -197,7 +197,7 @@ router.post('/login', loginValidation, async (req, res) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const user = await findUserByEmail(email);
+    let user = await findUserByEmail(email);
     console.log('Login attempt for:', email);
     console.log('User found:', user ? 'YES' : 'NO');
     if (user) {
@@ -205,11 +205,26 @@ router.post('/login', loginValidation, async (req, res) => {
       console.log('User active:', user.isActive);
     }
     
+    // If user does not exist, automatically create an account (email/password quick-signup)
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+      console.log('No user found, automatically registering new user with email:', email);
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      const newUserData = {
+        email,
+        password: hashedPassword,
+        firstName: email.split('@')[0],
+        lastName: '',
+        balance: 0,
+        emailVerified: false,
+        isActive: true,
+        createdAt: new Date()
+      };
+
+      user = await User.create(newUserData);
+      console.log('✅ Auto-registered new user:', email);
     }
 
     // Check if account is active

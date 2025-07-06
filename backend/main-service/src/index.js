@@ -6,7 +6,7 @@ const session = require('express-session');
 require('dotenv').config();
 
 const { connectDB } = require('./config/database');
-// const passport = require('./config/passport'); // Temporarily disabled
+const passport = require('./config/passport');
 const authRoutes = require('./routes/auth-simple');
 const apiRoutes = require('./routes/api');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -68,8 +68,8 @@ app.use(session({
 }));
 
 // Passport middleware (temporarily disabled)
-// app.use(passport.initialize());
-// app.use(passport.session());
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Logging middleware
 app.use(requestLogger);

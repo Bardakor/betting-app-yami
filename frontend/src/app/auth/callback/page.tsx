@@ -14,14 +14,14 @@ export default function AuthCallback() {
   useEffect(() => {
     // Prevent multiple executions
     if (hasProcessed.current) return;
-    
-    const handleCallback = async () => {
-      hasProcessed.current = true;
-      
-      const code = searchParams.get('code');
-      const error = searchParams.get('error');
-      const state = searchParams.get('state');
+    hasProcessed.current = true;
 
+    const handleCallback = async () => {
+      // Check for Google OAuth authorization code
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+      const error = searchParams.get('error');
+      
       // Handle OAuth errors
       if (error) {
         let errorMessage = 'Authentication failed';
@@ -33,6 +33,9 @@ export default function AuthCallback() {
           case 'oauth_failed':
             errorMessage = 'Google authentication failed. Please try again.';
             break;
+          case 'oauth_error':
+            errorMessage = 'Google authentication error. Please try again.';
+            break;
           default:
             errorMessage = 'Authentication failed. Please try again.';
         }
@@ -42,21 +45,21 @@ export default function AuthCallback() {
         return;
       }
 
-      // Verify state parameter for security
-      const storedState = sessionStorage.getItem('oauth_state');
-      if (state && storedState && state !== storedState) {
-        toast.error('Invalid authentication state. Please try again.');
-        router.push('/login');
-        return;
-      }
-
-      // Clear stored state
-      sessionStorage.removeItem('oauth_state');
-
+      // Handle Google OAuth code exchange
       if (code) {
         try {
-          // Send code to backend for token exchange
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google/callback`, {
+          // Verify state for CSRF protection
+          const savedState = sessionStorage.getItem('oauth_state');
+          sessionStorage.removeItem('oauth_state'); // Clean up
+          
+          if (state !== savedState) {
+            toast.error('Security verification failed. Please try again.');
+            router.push('/login');
+            return;
+          }
+          
+          // Exchange code for token with backend
+          const response = await fetch('http://localhost:3001/auth/google/callback', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -67,27 +70,43 @@ export default function AuthCallback() {
           const data = await response.json();
 
           if (data.success && data.token) {
-            // Set token and fetch user data
             await setTokenAndRefresh(data.token);
-            
             toast.success('Successfully logged in with Google!');
             router.push('/');
           } else {
-            throw new Error(data.message || 'Authentication failed');
+            toast.error(data.message || 'Google authentication failed');
+            router.push('/login');
           }
-        } catch (error) {
-          console.error('OAuth callback error:', error);
-          toast.error('Failed to process Google authentication. Please try again.');
+        } catch (err) {
+          console.error('Error during Google OAuth:', err);
+          toast.error('Failed to complete Google authentication');
           router.push('/login');
         }
-      } else {
-        toast.error('No authorization code received from Google.');
-        router.push('/login');
+        return;
       }
+
+      // Handle legacy passport-based redirect with token
+      const tokenParam = searchParams.get('token');
+      if (tokenParam) {
+        try {
+          await setTokenAndRefresh(tokenParam);
+          toast.success('Successfully logged in!');
+          router.push('/');
+        } catch (err) {
+          console.error('Error handling token:', err);
+          toast.error('Failed to process authentication token.');
+          router.push('/login');
+        }
+        return;
+      }
+
+      // No code, token, or error - something went wrong
+      toast.error('No authentication data received. Please try again.');
+      router.push('/login');
     };
 
     handleCallback();
-  }, []); // Empty dependency array to run only once
+  }, [searchParams, router, setTokenAndRefresh]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
@@ -97,5 +116,4 @@ export default function AuthCallback() {
         <p className="text-gray-400 text-sm">Please wait while we log you in</p>
       </div>
     </div>
-  );
-} 
+  ); 

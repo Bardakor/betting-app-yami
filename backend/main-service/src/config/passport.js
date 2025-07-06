@@ -14,19 +14,50 @@ passport.use(new GoogleStrategy({
     if (existingUser) {
       return done(null, existingUser);
     }
+
+    // Check if user exists by email
+    existingUser = await User.findOne({ email: profile.emails[0].value });
+    if (existingUser) {
+      // Link Google account to existing user
+      existingUser.googleId = profile.id;
+      existingUser.avatar = profile.photos[0].value;
+      existingUser.provider = 'google';
+      await existingUser.save();
+      return done(null, existingUser);
+    }
     
-    // Create new user
+    // Parse name from Google profile
+    const displayName = profile.displayName || '';
+    const nameParts = displayName.split(' ');
+    const firstName = nameParts[0] || profile.name?.givenName || 'User';
+    const lastName = nameParts.slice(1).join(' ') || profile.name?.familyName || '';
+    
+    // Create new user with proper schema
     const newUser = new User({
       googleId: profile.id,
       email: profile.emails[0].value,
-      name: profile.displayName,
+      firstName: firstName,
+      lastName: lastName,
       avatar: profile.photos[0].value,
-      provider: 'google'
+      provider: 'google',
+      balance: 0,
+      stats: {
+        totalBets: 0,
+        wonBets: 0,
+        lostBets: 0,
+        pendingBets: 0,
+        totalWinnings: 0,
+        totalLosses: 0
+      },
+      isActive: true,
+      emailVerified: true,
+      createdAt: new Date()
     });
     
     const savedUser = await newUser.save();
     done(null, savedUser);
   } catch (error) {
+    console.error('Google OAuth error:', error);
     done(error, null);
   }
 }));
