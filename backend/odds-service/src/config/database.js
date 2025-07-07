@@ -6,9 +6,9 @@ const initDatabase = async () => {
     const mongoHost = process.env.MONGO_HOST || 'localhost';
     
     // Connect without authentication for local development
-    const mongoURI = process.env.MONGODB_URI || `mongodb://${mongoHost}:27017/betting_main`;
+    const mongoURI = process.env.MONGODB_URI || `mongodb://admin:password123@${mongoHost}:27017/betting_platform?authSource=admin`;
     
-    console.log(`🔗 Connecting to MongoDB: ${mongoHost}:27017/betting_main`);
+    console.log(`🔗 Connecting to MongoDB: ${mongoHost}:27017/betting_platform`);
     
     await mongoose.connect(mongoURI);
     
