@@ -1,0 +1,147 @@
+{
+  "info": {
+    "name": "API Paris Sportifs - Demo Exposé",
+    "description": "Collection Postman pour démonstration d'API en 5 minutes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "🔴 1. MATCHS EN DIRECT ⭐",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/fixtures/live-now",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "fixtures", "live-now"]
+        },
+        "description": "🎯 REQUÊTE STAR pour votre démo !\n\n✨ Fonctionnalités démontrées :\n- Matchs en temps réel\n- Cotes calculées automatiquement\n- Groupement par compétition\n- Système de priorités\n- Gestion des événements live (buts, cartons)\n\n💡 Parfait pour commencer votre présentation avec un effet WOW !"
+      }
+    },
+    {
+      "name": "📅 2. MATCHS D'AUJOURD'HUI",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/fixtures/today",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "fixtures", "today"]
+        },
+        "description": "🗓️ Tous les matchs du jour avec analyse statistique\n\n✨ Points forts :\n- Prédictions et cotes pré-calculées\n- Statistiques détaillées des équipes\n- Organisation par importance\n- Cache intelligent pour les performances"
+      }
+    },
+    {
+      "name": "🔍 3. DÉTAILS MATCH SPÉCIFIQUE",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/fixtures/9001",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "fixtures", "9001"]
+        },
+        "description": "🏈 Informations complètes sur un match spécifique\n\n✨ Données disponibles :\n- Événements en temps réel\n- Statistiques avancées\n- Cotes mises à jour\n- Historique des équipes\n- Informations venue et arbitre"
+      }
+    },
+    {
+      "name": "🏆 4. RECHERCHE AVEC FILTRES",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/fixtures?league=39&season=2024&limit=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "fixtures"],
+          "query": [
+            {
+              "key": "league",
+              "value": "39",
+              "description": "Premier League"
+            },
+            {
+              "key": "season",
+              "value": "2024"
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "Nombre de résultats"
+            }
+          ]
+        },
+        "description": "🔎 Démonstration des capacités de filtrage avancé\n\n🎛️ Filtres disponibles :\n- league : ID de la ligue\n- team : ID de l'équipe\n- season : Année de la saison\n- status : Statut du match (LIVE, FT, NS)\n- limit : Nombre de résultats\n\n💡 Montrez la flexibilité de votre API !"
+      }
+    },
+    {
+      "name": "🏁 5. MATCHS TERMINÉS",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/fixtures/finished",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "fixtures", "finished"]
+        },
+        "description": "🏁 Récupération des matchs récemment terminés\n\n🎯 Utilisation :\n- Calcul des gains de paris\n- Mise à jour des statistiques\n- Données fraîches (2 dernières heures)\n- Essentiel pour le système de résultats"
+      }
+    },
+    {
+      "name": "🔎 6. RECHERCHE D'ÉQUIPES",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/fixtures/teams/search?name=Arsenal",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "fixtures", "teams", "search"],
+          "query": [
+            {
+              "key": "name",
+              "value": "Arsenal",
+              "description": "Nom de l'équipe à rechercher"
+            }
+          ]
+        },
+        "description": "🔍 Recherche intelligente d'équipes\n\n🎯 Paramètres :\n- name : Nom de l'équipe\n- league : Filtrer par ligue\n- country : Filtrer par pays\n\n💡 Parfait pour terminer en montrant la recherche flexible !"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "description": "URL de base de votre API (modifiez selon votre environnement)"
+    }
+  ]
+}

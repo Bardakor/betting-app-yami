@@ -308,6 +308,257 @@ function groupByCompetition(fixtures) {
   return sortedGroups;
 }
 
+// Generate fake live matches for demo purposes when no real matches are available
+function generateFakeLiveMatches() {
+  const now = Date.now();
+  
+  return [
+    {
+      fixture: {
+        id: 9001,
+        referee: "Anthony Taylor",
+        timezone: "UTC",
+        date: new Date(now - 2700000).toISOString(), // Started 45 mins ago
+        timestamp: now - 2700000,
+        periods: { first: now - 2700000, second: now - 900000 },
+        venue: { id: 494, name: "Emirates Stadium", city: "London" },
+        status: { long: "Second Half", short: "2H", elapsed: 72 }
+      },
+      league: {
+        id: 39,
+        name: "Premier League",
+        country: "England",
+        logo: "https://media.api-sports.io/football/leagues/39.png",
+        flag: "https://media.api-sports.io/flags/gb.svg",
+        season: 2024,
+        round: "Regular Season - 22"
+      },
+      teams: {
+        home: {
+          id: 42,
+          name: "Arsenal",
+          logo: "https://media.api-sports.io/football/teams/42.png",
+          winner: true
+        },
+        away: {
+          id: 47,
+          name: "Tottenham",
+          logo: "https://media.api-sports.io/football/teams/47.png",
+          winner: false
+        }
+      },
+      goals: { home: 3, away: 1 },
+      score: {
+        halftime: { home: 2, away: 0 },
+        fulltime: { home: null, away: null },
+        extratime: { home: null, away: null },
+        penalty: { home: null, away: null }
+      },
+      events: [
+        {
+          time: { elapsed: 12, extra: null },
+          team: { id: 42, name: "Arsenal" },
+          player: { id: 1460, name: "B. Saka" },
+          assist: { id: 1461, name: "M. Ødegaard" },
+          type: "Goal",
+          detail: "Normal Goal"
+        },
+        {
+          time: { elapsed: 28, extra: null },
+          team: { id: 42, name: "Arsenal" },
+          player: { id: 1463, name: "G. Jesus" },
+          assist: { id: 1464, name: "K. Havertz" },
+          type: "Goal",
+          detail: "Normal Goal"
+        },
+        {
+          time: { elapsed: 51, extra: null },
+          team: { id: 47, name: "Tottenham" },
+          player: { id: 1465, name: "H. Kane" },
+          assist: { id: null, name: null },
+          type: "Goal",
+          detail: "Penalty"
+        },
+        {
+          time: { elapsed: 68, extra: null },
+          team: { id: 42, name: "Arsenal" },
+          player: { id: 1461, name: "M. Ødegaard" },
+          assist: { id: 1460, name: "B. Saka" },
+          type: "Goal",
+          detail: "Normal Goal"
+        }
+      ],
+      isFakeMatch: true
+    },
+    {
+      fixture: {
+        id: 9002,
+        referee: "Daniele Orsato",
+        timezone: "UTC",
+        date: new Date(now - 1800000).toISOString(), // Started 30 mins ago
+        timestamp: now - 1800000,
+        periods: { first: now - 1800000, second: null },
+        venue: { id: 909, name: "Stadio Giuseppe Meazza", city: "Milano" },
+        status: { long: "First Half", short: "1H", elapsed: 33 }
+      },
+      league: {
+        id: 135,
+        name: "Serie A",
+        country: "Italy",
+        logo: "https://media.api-sports.io/football/leagues/135.png",
+        flag: "https://media.api-sports.io/flags/it.svg",
+        season: 2024,
+        round: "Regular Season - 18"
+      },
+      teams: {
+        home: {
+          id: 505,
+          name: "Inter",
+          logo: "https://media.api-sports.io/football/teams/505.png",
+          winner: null
+        },
+        away: {
+          id: 489,
+          name: "AC Milan",
+          logo: "https://media.api-sports.io/football/teams/489.png",
+          winner: null
+        }
+      },
+      goals: { home: 1, away: 0 },
+      score: {
+        halftime: { home: null, away: null },
+        fulltime: { home: null, away: null },
+        extratime: { home: null, away: null },
+        penalty: { home: null, away: null }
+      },
+      events: [
+        {
+          time: { elapsed: 18, extra: null },
+          team: { id: 505, name: "Inter" },
+          player: { id: 1470, name: "L. Martínez" },
+          assist: { id: 1471, name: "N. Barella" },
+          type: "Goal",
+          detail: "Normal Goal"
+        }
+      ],
+      isFakeMatch: true
+    },
+    {
+      fixture: {
+        id: 9003,
+        referee: "Clément Turpin",
+        timezone: "UTC",
+        date: new Date(now - 600000).toISOString(), // Started 10 mins ago
+        timestamp: now - 600000,
+        periods: { first: now - 600000, second: null },
+        venue: { id: 671, name: "Parc des Princes", city: "Paris" },
+        status: { long: "First Half", short: "1H", elapsed: 12 }
+      },
+      league: {
+        id: 61,
+        name: "Ligue 1",
+        country: "France",
+        logo: "https://media.api-sports.io/football/leagues/61.png",
+        flag: "https://media.api-sports.io/flags/fr.svg",
+        season: 2024,
+        round: "Regular Season - 20"
+      },
+      teams: {
+        home: {
+          id: 85,
+          name: "Paris Saint Germain",
+          logo: "https://media.api-sports.io/football/teams/85.png",
+          winner: null
+        },
+        away: {
+          id: 80,
+          name: "Lyon",
+          logo: "https://media.api-sports.io/football/teams/80.png",
+          winner: null
+        }
+      },
+      goals: { home: 0, away: 0 },
+      score: {
+        halftime: { home: null, away: null },
+        fulltime: { home: null, away: null },
+        extratime: { home: null, away: null },
+        penalty: { home: null, away: null }
+      },
+      events: [],
+      isFakeMatch: true
+    },
+    {
+      fixture: {
+        id: 9004,
+        referee: "Slavko Vincic",
+        timezone: "UTC",
+        date: new Date(now - 3300000).toISOString(), // Started 55 mins ago
+        timestamp: now - 3300000,
+        periods: { first: now - 3300000, second: now - 900000 },
+        venue: { id: 1456, name: "Santiago Bernabéu", city: "Madrid" },
+        status: { long: "Second Half", short: "2H", elapsed: 82 }
+      },
+      league: {
+        id: 2,
+        name: "UEFA Champions League",
+        country: "World",
+        logo: "https://media.api-sports.io/football/leagues/2.png",
+        flag: null,
+        season: 2024,
+        round: "Quarter-finals"
+      },
+      teams: {
+        home: {
+          id: 541,
+          name: "Real Madrid",
+          logo: "https://media.api-sports.io/football/teams/541.png",
+          winner: true
+        },
+        away: {
+          id: 50,
+          name: "Manchester City",
+          logo: "https://media.api-sports.io/football/teams/50.png",
+          winner: false
+        }
+      },
+      goals: { home: 2, away: 1 },
+      score: {
+        halftime: { home: 0, away: 1 },
+        fulltime: { home: null, away: null },
+        extratime: { home: null, away: null },
+        penalty: { home: null, away: null }
+      },
+      events: [
+        {
+          time: { elapsed: 23, extra: null },
+          team: { id: 50, name: "Manchester City" },
+          player: { id: 1480, name: "E. Haaland" },
+          assist: { id: 1481, name: "K. De Bruyne" },
+          type: "Goal",
+          detail: "Normal Goal"
+        },
+        {
+          time: { elapsed: 64, extra: null },
+          team: { id: 541, name: "Real Madrid" },
+          player: { id: 1482, name: "Vinícius Jr." },
+          assist: { id: 1483, name: "L. Modrić" },
+          type: "Goal",
+          detail: "Normal Goal"
+        },
+        {
+          time: { elapsed: 79, extra: null },
+          team: { id: 541, name: "Real Madrid" },
+          player: { id: 1484, name: "K. Benzema" },
+          assist: { id: 1485, name: "T. Kroos" },
+          type: "Goal",
+          detail: "Normal Goal"
+        }
+      ],
+      isFakeMatch: true
+    }
+  ];
+}
+
 // Helper function to make API calls
 async function makeApiCall(endpoint, params = {}) {
   try {
@@ -382,7 +633,7 @@ router.get('/live-now', apiLimiter, async (req, res) => {
             country: "England",
             logo: "https://media.api-sports.io/football/leagues/39.png",
             flag: "https://media.api-sports.io/flags/gb.svg",
-            season: 2025,
+            season: 2023,
             round: "Regular Season - 20"
           },
           teams: {
@@ -453,7 +704,7 @@ router.get('/live-now', apiLimiter, async (req, res) => {
             country: "Italy",
             logo: "https://media.api-sports.io/football/leagues/135.png",
             flag: "https://media.api-sports.io/flags/it.svg",
-            season: 2025,
+            season: 2023,
             round: "Regular Season - 16"
           },
           teams: {
@@ -522,6 +773,12 @@ router.get('/live-now', apiLimiter, async (req, res) => {
 
     let fixtures = result.data.response || [];
     
+    // If no live matches found, add fake matches for demo purposes
+    if (fixtures.length === 0) {
+      logApi('🎭 No live matches found, generating fake matches for demo');
+      fixtures = generateFakeLiveMatches();
+    }
+    
     // Sort by competition importance
     fixtures = sortByCompetition(fixtures);
     
@@ -554,7 +811,8 @@ router.get('/live-now', apiLimiter, async (req, res) => {
       groupedByCompetition: groupedFixtures,
       sortedByImportance: true,
       oddsCalculation: 'statistical',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isFakeData: fixtures.length > 0 && fixtures[0].isFakeMatch
     };
 
     // Cache for only 5 minutes since these are live games
@@ -610,7 +868,7 @@ router.get('/today', apiLimiter, async (req, res) => {
             country: "England",
             logo: "https://media.api-sports.io/football/leagues/39.png",
             flag: "https://media.api-sports.io/flags/gb.svg",
-            season: 2025,
+            season: 2023,
             round: "Regular Season - 20"
           },
           teams: {
@@ -652,7 +910,7 @@ router.get('/today', apiLimiter, async (req, res) => {
             country: "Spain",
             logo: "https://media.api-sports.io/football/leagues/140.png",
             flag: "https://media.api-sports.io/flags/es.svg",
-            season: 2025,
+            season: 2023,
             round: "Regular Season - 18"
           },
           teams: {
@@ -694,7 +952,7 @@ router.get('/today', apiLimiter, async (req, res) => {
             country: "Germany",
             logo: "https://media.api-sports.io/football/leagues/78.png",
             flag: "https://media.api-sports.io/flags/de.svg",
-            season: 2025,
+            season: 2023,
             round: "Regular Season - 15"
           },
           teams: {
@@ -813,7 +1071,7 @@ router.get('/', apiLimiter, async (req, res) => {
   logApi('🏈 [FIXTURES] GET / - Main fixtures endpoint');
   
   try {
-    const { limit = 20, league, team, season = 2025, status } = req.query;
+    const { limit = 20, league, team, season = 2023, status } = req.query;
     const cacheKey = `fixtures-${JSON.stringify(req.query)}`;
     const cachedData = cache.get(cacheKey);
     
