@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Pages that don't require authentication
   const publicPaths = ['/login', '/auth/callback'];
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   useEffect(() => {
     initializeAuth();
@@ -37,37 +38,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Redirect logic based on authentication state
-    if (!isLoading) {
+    // Only redirect after we've completed initialization
+    if (!isLoading && hasInitialized) {
       const isPublicPath = publicPaths.includes(pathname);
       
       if (!user && !isPublicPath) {
         // User not authenticated and trying to access protected route
+        console.log('Redirecting to login - no user and not on public path');
         router.push('/login');
       } else if (user && pathname === '/login') {
         // User authenticated but on login page
+        console.log('Redirecting to home - user authenticated but on login page');
         router.push('/');
       }
     }
-  }, [user, isLoading, pathname, router]);
+  }, [user, isLoading, pathname, router, hasInitialized]);
 
   const initializeAuth = async () => {
     try {
       setIsLoading(true);
       
       // Check if user is already authenticated
-      const currentUser = authService.getUser();
       const token = authService.getToken();
       
-      if (token && currentUser) {
-        setUser(currentUser);
-        // Refresh user data to ensure it's up to date
-        await refreshUser();
+      if (token) {
+        // Try to get user from localStorage first
+        const currentUser = authService.getUser();
+        if (currentUser) {
+          setUser(currentUser);
+        }
+        
+        // Then refresh user data from backend to ensure it's up to date
+        try {
+          await authService.refreshUserData();
+          const updatedUser = authService.getUser();
+          if (updatedUser) {
+            setUser(updatedUser);
+          } else {
+            // If we can't get user data, logout
+            authService.logout();
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Failed to refresh user data:', error);
+          // If refresh fails but we have cached user data, keep using it
+          if (!currentUser) {
+            authService.logout();
+            setUser(null);
+          }
+        }
       }
     } catch (error) {
       console.error('Auth initialization error:', error);
       authService.logout();
+      setUser(null);
     } finally {
       setIsLoading(false);
+      setHasInitialized(true);
     }
   };
 

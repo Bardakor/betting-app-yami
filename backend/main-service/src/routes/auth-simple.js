@@ -5,6 +5,39 @@ const axios = require('axios');
 const { users } = require('../config/shared-users');
 const router = express.Router();
 
+// Authentication middleware
+const authenticate = (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
+    const user = users.find(u => u.id === decoded.userId);
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Authentication error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+};
+
 // JWT token generation
 const generateToken = (userId) => {
   return jwt.sign(
@@ -325,83 +358,11 @@ router.get('/profile', (req, res) => {
   }
 });
 
-// @route   POST /auth/update-balance
-// @desc    Update user balance
-// @access  Private
-router.post('/update-balance', (req, res) => {
+// Admin: Update user balance (for service-to-service calls)
+router.post('/admin/update-user-balance', authenticate, (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'No token provided'
-      });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
-    const user = users.find(u => u.id === decoded.userId);
-    
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    const { amount, operation } = req.body;
-
-    if (!amount || !operation || !['add', 'subtract'].includes(operation)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid amount and operation (add/subtract) are required'
-      });
-    }
-
-    if (operation === 'add') {
-      user.balance += parseFloat(amount);
-    } else {
-      if (user.balance < parseFloat(amount)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Insufficient balance'
-        });
-      }
-      user.balance -= parseFloat(amount);
-    }
-
-    res.json({
-      success: true,
-      message: 'Balance updated successfully',
-      newBalance: user.balance
-    });
-  } catch (error) {
-    console.error('❌ Update balance error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error updating balance'
-    });
-  }
-});
-
-// @route   POST /auth/admin/update-user-balance
-// @desc    Admin update any user's balance
-// @access  Private (Admin only)
-router.post('/admin/update-user-balance', (req, res) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'No token provided'
-      });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
-    const adminUser = users.find(u => u.id === decoded.userId);
-    
-    if (!adminUser || adminUser.email !== 'admin@admin.com') {
+    // Check if user is admin
+    if (req.user.email !== 'admin@admin.com') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Admin privileges required.'
@@ -410,15 +371,22 @@ router.post('/admin/update-user-balance', (req, res) => {
 
     const { userId, amount, operation } = req.body;
 
-    if (!userId || !amount || !operation || !['add', 'subtract'].includes(operation)) {
+    if (!userId || !amount || !operation) {
       return res.status(400).json({
         success: false,
-        message: 'User ID, valid amount, and operation (add/subtract) are required'
+        message: 'userId, amount, and operation are required'
       });
     }
 
+    if (!['add', 'subtract'].includes(operation)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Operation must be "add" or "subtract"'
+      });
+    }
+
+    // Find user
     const user = users.find(u => u.id === userId);
-    
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -426,31 +394,42 @@ router.post('/admin/update-user-balance', (req, res) => {
       });
     }
 
+    // Update balance
+    const oldBalance = user.balance;
     if (operation === 'add') {
-      user.balance += parseFloat(amount);
+      user.balance += amount;
     } else {
-      if (user.balance < parseFloat(amount)) {
+      if (user.balance < amount) {
         return res.status(400).json({
           success: false,
-          message: 'User has insufficient balance'
+          message: 'Insufficient balance',
+          currentBalance: user.balance,
+          requiredAmount: amount
         });
       }
-      user.balance -= parseFloat(amount);
+      user.balance -= amount;
     }
+
+    // Update stats if available
+    if (operation === 'subtract' && user.stats) {
+      user.stats.totalStaked = (user.stats.totalStaked || 0) + amount;
+    }
+
+    console.log(`Balance updated for user ${user.email}: ${oldBalance} -> ${user.balance}`);
 
     res.json({
       success: true,
-      message: 'User balance updated successfully',
+      message: 'Balance updated successfully',
+      oldBalance,
       newBalance: user.balance,
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName
+        balance: user.balance
       }
     });
   } catch (error) {
-    console.error('❌ Admin update balance error:', error);
+    console.error('Update balance error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error updating balance'
@@ -458,9 +437,7 @@ router.post('/admin/update-user-balance', (req, res) => {
   }
 });
 
-// @route   GET /auth/user/:userId/balance
-// @desc    Get user balance by ID (for services)
-// @access  Public (internal service calls)
+// Get user balance by ID (for service-to-service calls)
 router.get('/user/:userId/balance', (req, res) => {
   try {
     const user = users.find(u => u.id === req.params.userId);
@@ -474,10 +451,11 @@ router.get('/user/:userId/balance', (req, res) => {
 
     res.json({
       success: true,
+      userId: user.id,
       balance: user.balance
     });
   } catch (error) {
-    console.error('❌ Get user balance error:', error);
+    console.error('Get user balance error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error fetching balance'
@@ -485,7 +463,199 @@ router.get('/user/:userId/balance', (req, res) => {
   }
 });
 
+// Update balance endpoint (for authenticated users)
+router.post('/update-balance', authenticate, (req, res) => {
+  try {
+    const { amount, operation } = req.body;
+
+    if (!amount || !operation) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount and operation are required'
+      });
+    }
+
+    if (!['add', 'subtract'].includes(operation)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Operation must be "add" or "subtract"'
+      });
+    }
+
+    const user = users.find(u => u.id === req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const oldBalance = user.balance;
+    if (operation === 'add') {
+      user.balance += amount;
+    } else {
+      if (user.balance < amount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient balance'
+        });
+      }
+      user.balance -= amount;
+    }
+
+    console.log(`Balance updated for user ${user.email}: ${oldBalance} -> ${user.balance}`);
+
+    res.json({
+      success: true,
+      message: 'Balance updated successfully',
+      oldBalance,
+      newBalance: user.balance
+    });
+  } catch (error) {
+    console.error('Update balance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating balance'
+    });
+  }
+});
+
 // Export users array for access from other files
 router.users = users;
+
+// Deposit endpoint (simplified for immediate functionality)
+router.post('/deposit', authenticate, (req, res) => {
+  try {
+    const { amount, paymentMethod = 'credit_card' } = req.body;
+
+    // Validation
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid amount. Must be greater than 0.'
+      });
+    }
+
+    if (amount > 10000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Maximum deposit amount is $10,000'
+      });
+    }
+
+    const user = users.find(u => u.id === req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const oldBalance = user.balance;
+    user.balance += amount;
+
+    console.log(`Deposit successful for user ${user.email}: ${oldBalance} -> ${user.balance}`);
+
+    res.json({
+      success: true,
+      message: 'Deposit successful',
+      transaction: {
+        amount: amount,
+        newBalance: user.balance,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Deposit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error processing deposit'
+    });
+  }
+});
+
+// Bet placement endpoint (simplified for immediate functionality)
+router.post('/place-bet', authenticate, (req, res) => {
+  try {
+    const { fixtureId, betType, selection, stake, odds } = req.body;
+
+    // Validation
+    if (!fixtureId || !betType || !selection || !stake || !odds) {
+      return res.status(400).json({
+        success: false,
+        message: 'All bet parameters are required'
+      });
+    }
+
+    if (stake <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stake must be greater than 0'
+      });
+    }
+
+    const user = users.find(u => u.id === req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.balance < stake) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient balance'
+      });
+    }
+
+    // Deduct stake from balance
+    const oldBalance = user.balance;
+    user.balance -= stake;
+
+    // Update user stats
+    if (!user.stats) {
+      user.stats = {
+        totalBets: 0,
+        wonBets: 0,
+        lostBets: 0,
+        pendingBets: 0,
+        totalWinnings: 0,
+        totalLosses: 0
+      };
+    }
+
+    user.stats.totalBets += 1;
+    user.stats.pendingBets += 1;
+
+    const betId = `bet_${Date.now()}_${user.id.slice(-6)}`;
+    const potentialWin = stake * odds;
+
+    console.log(`Bet placed for user ${user.email}: ${oldBalance} -> ${user.balance}, Bet ID: ${betId}`);
+
+    res.json({
+      success: true,
+      message: 'Bet placed successfully',
+      bet: {
+        id: betId,
+        fixtureId,
+        betType,
+        selection,
+        stake,
+        odds,
+        potentialWin,
+        status: 'active',
+        placedAt: new Date().toISOString()
+      },
+      newBalance: user.balance
+    });
+  } catch (error) {
+    console.error('Bet placement error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error placing bet'
+    });
+  }
+});
 
 module.exports = router; 

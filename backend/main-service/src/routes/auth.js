@@ -430,9 +430,9 @@ router.post('/change-password', auth, [
 // @route   GET /auth/google
 // @desc    Start Google OAuth flow
 // @access  Public
-router.get('/google', 
-  passport.authenticate('google', { 
-    scope: ['profile', 'email'] 
+router.get('/google',
+  passport.authenticate('google', {
+    scope: ['profile', 'email']
   })
 );
 
@@ -440,9 +440,9 @@ router.get('/google',
 // @desc    Google OAuth callback
 // @access  Public
 router.get('/google/callback',
-  passport.authenticate('google', { 
+  passport.authenticate('google', {
     failureRedirect: `${process.env.FRONTEND_URL}/login?error=oauth_failed`,
-    session: false 
+    session: false
   }),
   (req, res) => {
     try {
@@ -461,6 +461,116 @@ router.get('/google/callback',
     }
   }
 );
+
+// @route   POST /auth/google/callback
+// @desc    Handle Google OAuth code exchange
+// @access  Public
+router.post('/google/callback', async (req, res) => {
+  try {
+    const { code, state } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Authorization code is required'
+      });
+    }
+
+    console.log('📝 POST /auth/google/callback - Processing OAuth code exchange');
+    
+    // Exchange authorization code for tokens
+    const { OAuth2Client } = require('google-auth-library');
+    const client = new OAuth2Client(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      'http://localhost:3000/auth/callback'
+    );
+
+    try {
+      const { tokens } = await client.getToken(code);
+      const ticket = await client.verifyIdToken({
+        idToken: tokens.id_token,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+      
+      const payload = ticket.getPayload();
+      const { sub: googleId, email, given_name, family_name, picture } = payload;
+
+      // Find or create user
+      let user = await User.findOne({ googleId });
+      
+      if (!user) {
+        // Check if user exists by email
+        user = await User.findOne({ email });
+        if (user) {
+          // Link Google account to existing user
+          user.googleId = googleId;
+          user.avatar = picture;
+          await user.save();
+        } else {
+          // Create new user
+          user = await User.create({
+            googleId,
+            email,
+            firstName: given_name || email.split('@')[0],
+            lastName: family_name || '',
+            avatar: picture,
+            provider: 'google',
+            balance: 0,
+            stats: {
+              totalBets: 0,
+              wonBets: 0,
+              lostBets: 0,
+              pendingBets: 0,
+              totalWinnings: 0,
+              totalLosses: 0
+            },
+            isActive: true,
+            emailVerified: true,
+            createdAt: new Date()
+          });
+        }
+      }
+
+      // Update last login
+      user.lastLogin = new Date();
+      await user.save();
+
+      // Generate JWT token
+      const token = generateToken(user._id);
+
+      console.log(`✅ Google OAuth successful for user: ${email}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Google authentication successful',
+        token,
+        user: {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: `${user.firstName} ${user.lastName}`,
+          balance: user.balance || 0,
+          avatar: user.avatar,
+          isActive: user.isActive
+        }
+      });
+    } catch (error) {
+      console.error('Google token exchange error:', error);
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to exchange authorization code'
+      });
+    }
+  } catch (error) {
+    console.error('Google OAuth callback error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Google authentication failed'
+    });
+  }
+});
 
 // @route   GET /auth/verify-token
 // @desc    Verify JWT token
@@ -721,4 +831,48 @@ router.get('/admin/user/:userId', auth, async (req, res) => {
   }
 });
 
-module.exports = router; 
+// @route   GET /auth/profile
+// @desc    Get current user profile (alias for /auth/me)
+// @access  Private
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: `${user.firstName} ${user.lastName}`,
+        balance: user.balance || 0,
+        stats: user.stats || {
+          totalBets: 0,
+          wonBets: 0,
+          lostBets: 0,
+          pendingBets: 0,
+          totalWinnings: 0,
+          totalLosses: 0
+        },
+        isActive: user.isActive !== false,
+        emailVerified: user.emailVerified,
+        preferences: user.preferences
+      }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching profile'
+    });
+  }
+});
+
+module.exports = router;

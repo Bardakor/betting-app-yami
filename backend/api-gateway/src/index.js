@@ -647,7 +647,7 @@ app.use('/api/auth', createProxyMiddleware({
   target: services.main,
   changeOrigin: true,
   pathRewrite: {
-    '^/api/auth': '/api/auth'
+    '^/api/auth': '/auth'
   },
   onError: (err, req, res) => {
     console.error('Main Service proxy error:', err.message);

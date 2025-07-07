@@ -32,19 +32,26 @@ class AuthService {
   constructor() {
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('auth_token');
-      if (this.token) {
+      const storedUser = localStorage.getItem('auth_user');
+      
+      if (this.token && storedUser) {
         try {
           // Verify token is still valid
           const decoded: any = jwtDecode(this.token);
           if (decoded.exp * 1000 < Date.now()) {
             this.logout();
           } else {
-            // Token is valid, try to get user info
+            // Token is valid, restore user from localStorage
+            this.user = JSON.parse(storedUser);
+            // Refresh user data in background
             this.refreshUserData();
           }
         } catch (error) {
           this.logout();
         }
+      } else if (this.token) {
+        // Token exists but no user data, try to fetch it
+        this.refreshUserData();
       }
     }
   }
@@ -65,6 +72,7 @@ class AuthService {
         this.token = data.token;
         this.user = data.user;
         localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('auth_user', JSON.stringify(data.user));
         return data;
       }
 
@@ -99,6 +107,7 @@ class AuthService {
         this.token = data.token;
         this.user = data.user;
         localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('auth_user', JSON.stringify(data.user));
         return data;
       }
 
@@ -115,6 +124,8 @@ class AuthService {
   async refreshUserData(): Promise<void> {
     if (!this.token) return;
 
+    console.log('Refreshing user data with token:', this.token.substring(0, 20) + '...');
+
     try {
       const response = await fetch('http://localhost:3001/auth/profile', {
         headers: {
@@ -122,11 +133,16 @@ class AuthService {
         },
       });
 
+      console.log('User profile response status:', response.status);
       const data = await response.json();
+      console.log('User profile response data:', data);
 
       if (data.success) {
         this.user = data.user;
+        localStorage.setItem('auth_user', JSON.stringify(data.user));
+        console.log('User data refreshed successfully:', this.user);
       } else {
+        console.error('Failed to refresh user data:', data);
         this.logout();
       }
     } catch (error) {
@@ -136,15 +152,24 @@ class AuthService {
   }
 
   async setTokenAndFetchUser(token: string): Promise<void> {
+    console.log('Setting token and fetching user...');
     this.token = token;
     localStorage.setItem('auth_token', token);
     
     try {
       // Decode the token to get basic user info
       const decoded: any = jwtDecode(token);
+      console.log('Decoded token:', decoded);
       
       // Fetch full user profile
       await this.refreshUserData();
+      
+      if (!this.user) {
+        throw new Error('Failed to fetch user data after setting token');
+      }
+      
+      // Store user data immediately
+      localStorage.setItem('auth_user', JSON.stringify(this.user));
     } catch (error) {
       console.error('Token processing error:', error);
       this.logout();
@@ -157,6 +182,7 @@ class AuthService {
     this.user = null;
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
     }
   }
 
@@ -177,9 +203,9 @@ class AuthService {
   }
 
   async apiRequest(url: string, options: RequestInit = {}): Promise<any> {
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     if (this.token) {
@@ -203,7 +229,11 @@ class AuthService {
   // Wallet operations
   async getBalance(): Promise<{ success: boolean; balance?: number; message?: string }> {
     try {
-      return await this.apiRequest('http://localhost:3004/api/wallet/balance');
+      const response = await this.apiRequest('http://localhost:3001/auth/profile');
+      if (response.success) {
+        return { success: true, balance: response.user.balance };
+      }
+      return { success: false, message: 'Failed to fetch balance' };
     } catch (error) {
       return { success: false, message: 'Failed to fetch balance' };
     }
@@ -211,7 +241,7 @@ class AuthService {
 
   async deposit(amount: number, paymentMethod = 'credit_card'): Promise<any> {
     try {
-      return await this.apiRequest('http://localhost:3004/api/wallet/deposit', {
+      return await this.apiRequest('http://localhost:3001/auth/deposit', {
         method: 'POST',
         body: JSON.stringify({ amount, paymentMethod }),
       });
@@ -248,7 +278,7 @@ class AuthService {
     odds: number;
   }): Promise<any> {
     try {
-      return await this.apiRequest('http://localhost:3005/api/bets/place', {
+      return await this.apiRequest('http://localhost:3001/auth/place-bet', {
         method: 'POST',
         body: JSON.stringify(betData),
       });
@@ -278,7 +308,7 @@ class AuthService {
   // Admin operations
   async addFundsToUser(userId: string, amount: number, description?: string): Promise<any> {
     try {
-      return await this.apiRequest('http://localhost:3004/api/wallet/admin/add-funds', {
+      return await this.apiRequest('http://localhost:8000/api/wallet/admin/add-funds', {
         method: 'POST',
         body: JSON.stringify({ userId, amount, description }),
       });
@@ -291,7 +321,7 @@ class AuthService {
     try {
       const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
       if (search) params.append('search', search);
-      return await this.apiRequest(`http://localhost:3001/api/admin/users?${params}`);
+      return await this.apiRequest(`http://localhost:8000/api/admin/users?${params}`);
     } catch (error) {
       return { success: false, message: 'Failed to fetch users' };
     }
@@ -299,7 +329,7 @@ class AuthService {
 
   async createAdminUser(): Promise<any> {
     try {
-      const response = await fetch('http://localhost:3001/api/admin/create', {
+      const response = await fetch('http://localhost:8000/api/admin/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

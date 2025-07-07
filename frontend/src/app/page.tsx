@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
   Activity,
   Clock,
   BarChart3,
@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BetSlip } from '@/components/BetSlip';
+import { useRequireAuth } from '@/contexts/AuthContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -44,6 +45,9 @@ const itemVariants = {
 };
 
 export default function Dashboard() {
+  // Use authentication hook
+  const { user, isLoading: authLoading } = useRequireAuth();
+  
   // All hooks must be at the top level - never inside conditions
   const [isLoading, setIsLoading] = useState(true);
   const [liveMatches, setLiveMatches] = useState<any[]>([]);
@@ -53,7 +57,7 @@ export default function Dashboard() {
     profit: 0,
     profitChange: 0,
     activeBets: 0,
-    portfolio: 0
+    portfolio: user?.balance || 0
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   
@@ -131,12 +135,14 @@ export default function Dashboard() {
         
         // For now, use default stats since we removed mock data
         setStats({
-          totalBets: 0,
-          winRate: 0,
-          profit: 0,
+          totalBets: user?.stats?.totalBets || 0,
+          winRate: user?.stats?.wonBets && user?.stats?.totalBets
+            ? Math.round((user.stats.wonBets / user.stats.totalBets) * 100)
+            : 0,
+          profit: (user?.stats?.totalWinnings || 0) - (user?.stats?.totalLosses || 0),
           profitChange: 0,
-          activeBets: 0,
-          portfolio: 0
+          activeBets: user?.stats?.pendingBets || 0,
+          portfolio: user?.balance || 0
         });
 
         setRecentActivity([]);
@@ -170,7 +176,7 @@ export default function Dashboard() {
   }, []);
 
   // Now we can conditionally render based on state
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
@@ -192,7 +198,7 @@ export default function Dashboard() {
             Dashboard
           </h1>
           <p className="text-gray-400 mt-1">
-            Welcome back! Here's your betting overview
+            Welcome back{user?.firstName ? `, ${user.firstName}` : ''}! Here's your betting overview
           </p>
         </div>
         

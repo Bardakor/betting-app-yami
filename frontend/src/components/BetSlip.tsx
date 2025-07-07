@@ -76,10 +76,13 @@ export function BetSlip({ isOpen, onClose, items, onRemoveItem, onClearAll }: Be
     setIsPlacing(true);
 
     try {
+      // Normalize betType to match backend expectations
+      const normalizedBetType = item.betType.toLowerCase().replace(/\s+/g, '_');
+      
       const response = await authService.placeBet({
         fixtureId: item.fixtureId,
-        betType: item.betType,
-        selection: item.selection,
+        betType: normalizedBetType,
+        selection: item.selection.toLowerCase(),
         stake: stake,
         odds: item.odds
       });
@@ -99,7 +102,8 @@ export function BetSlip({ isOpen, onClose, items, onRemoveItem, onClearAll }: Be
         toast.error(response.message || 'Failed to place bet');
       }
     } catch (error) {
-      toast.error('Failed to place bet');
+      console.error('Bet placement error:', error);
+      toast.error('Failed to place bet. Please check your connection.');
     } finally {
       setIsPlacing(false);
     }
@@ -126,10 +130,13 @@ export function BetSlip({ isOpen, onClose, items, onRemoveItem, onClearAll }: Be
     for (const item of items) {
       try {
         const stake = parseFloat(stakes[item.id]);
+        // Normalize betType to match backend expectations
+        const normalizedBetType = item.betType.toLowerCase().replace(/\s+/g, '_');
+        
         const response = await authService.placeBet({
           fixtureId: item.fixtureId,
-          betType: item.betType,
-          selection: item.selection,
+          betType: normalizedBetType,
+          selection: item.selection.toLowerCase(),
           stake: stake,
           odds: item.odds
         });
@@ -143,6 +150,7 @@ export function BetSlip({ isOpen, onClose, items, onRemoveItem, onClearAll }: Be
         }
       } catch (error) {
         failCount++;
+        console.error(`Failed to place bet on ${item.match}:`, error);
         toast.error(`Failed to place bet on ${item.match}`);
       }
     }

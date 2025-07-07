@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const { connectDB } = require('./config/database');
 const passport = require('./config/passport');
-const authRoutes = require('./routes/auth-simple');
+const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');

@@ -17,6 +17,15 @@ export default function AuthCallback() {
     hasProcessed.current = true;
 
     const handleCallback = async () => {
+      // Debug: Log all search params
+      console.log('Auth callback - All search params:', {
+        code: searchParams.get('code'),
+        state: searchParams.get('state'),
+        error: searchParams.get('error'),
+        token: searchParams.get('token'),
+        allParams: searchParams.toString()
+      });
+
       // Check for Google OAuth authorization code
       const code = searchParams.get('code');
       const state = searchParams.get('state');
@@ -24,6 +33,7 @@ export default function AuthCallback() {
       
       // Handle OAuth errors
       if (error) {
+        console.error('OAuth error received:', error);
         let errorMessage = 'Authentication failed';
         
         switch (error) {
@@ -47,16 +57,23 @@ export default function AuthCallback() {
 
       // Handle Google OAuth code exchange
       if (code) {
+        console.log('Processing Google OAuth code:', code);
+        console.log('State parameter:', state);
+        
         try {
           // Verify state for CSRF protection
           const savedState = sessionStorage.getItem('oauth_state');
+          console.log('Saved state from session:', savedState);
           sessionStorage.removeItem('oauth_state'); // Clean up
           
           if (state !== savedState) {
+            console.error('State mismatch - CSRF protection triggered');
             toast.error('Security verification failed. Please try again.');
             router.push('/login');
             return;
           }
+          
+          console.log('Exchanging code for token with backend...');
           
           // Exchange code for token with backend
           const response = await fetch('http://localhost:3001/auth/google/callback', {
@@ -67,13 +84,27 @@ export default function AuthCallback() {
             body: JSON.stringify({ code, state }),
           });
 
+          console.log('Backend response status:', response.status);
           const data = await response.json();
+          console.log('Backend response data:', data);
 
           if (data.success && data.token) {
-            await setTokenAndRefresh(data.token);
-            toast.success('Successfully logged in with Google!');
-            router.push('/');
+            console.log('Token received, setting auth...');
+            try {
+              await setTokenAndRefresh(data.token);
+              
+              // Add a small delay to ensure auth state is fully updated
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              toast.success('Successfully logged in with Google!');
+              router.push('/');
+            } catch (err) {
+              console.error('Failed to set token and refresh user:', err);
+              toast.error('Authentication failed. Please try again.');
+              router.push('/login');
+            }
           } else {
+            console.error('Backend auth failed:', data);
             toast.error(data.message || 'Google authentication failed');
             router.push('/login');
           }
@@ -88,6 +119,7 @@ export default function AuthCallback() {
       // Handle legacy passport-based redirect with token
       const tokenParam = searchParams.get('token');
       if (tokenParam) {
+        console.log('Processing token from URL:', tokenParam);
         try {
           await setTokenAndRefresh(tokenParam);
           toast.success('Successfully logged in!');
@@ -101,6 +133,7 @@ export default function AuthCallback() {
       }
 
       // No code, token, or error - something went wrong
+      console.error('No authentication data received in callback');
       toast.error('No authentication data received. Please try again.');
       router.push('/login');
     };
@@ -117,3 +150,4 @@ export default function AuthCallback() {
       </div>
     </div>
   ); 
+} 
