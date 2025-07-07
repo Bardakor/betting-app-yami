@@ -246,31 +246,52 @@ cp backend/main-service/.env.example backend/main-service/.env
 # Configure your API keys and database URLs
 ```
 
-#### **3. Quick Start - All Services**
+#### **3. MongoDB Setup with Docker**
 ```bash
-# Start all microservices with one command
-chmod +x bash/start-services.sh
-./bash/start-services.sh
+# The updated setup script now handles MongoDB automatically
+chmod +x bash/clean-and-dev.sh
+./bash/clean-and-dev.sh
 
-# Alternative: Individual service management
+# This script will:
+# 1. Stop existing services and free up ports
+# 2. Start MongoDB with Docker Compose
+# 3. Wait for MongoDB to be ready
+# 4. Start all application services
+```
+
+**MongoDB Services:**
+- **MongoDB**: `mongodb://localhost:27017` (with auth: `admin/password123`)
+- **Mongo Express**: `http://localhost:8081` (Web UI for database management)
+- **Database**: `betting_platform` (auto-created with sample data)
+
+**Test MongoDB Connection:**
+```bash
+# Test if MongoDB is working correctly
+node test-mongodb-setup.js
+```
+
+#### **4. Alternative Setup - Individual Services**
+```bash
+# Manual service management (if needed)
 cd backend/main-service && npm start     # Port 3001
 cd backend/fixtures-service && npm start # Port 3002
 cd backend/odds-service && npm start     # Port 3003
 # ... continue for all services
 ```
 
-#### **4. Frontend Launch**
+#### **5. Frontend Launch**
 ```bash
 cd frontend
 npm install
 npm run dev                              # Port 3000
 ```
 
-#### **5. Access the Application**
+#### **6. Access the Application**
 - **Frontend**: http://localhost:3000
 - **API Gateway**: http://localhost:8080
 - **Main API**: http://localhost:3001
-- **MongoDB Express**: http://localhost:8081 (if using Docker)
+- **MongoDB**: mongodb://localhost:27017 (admin/password123)
+- **MongoDB Express**: http://localhost:8081 (Database Web UI)
 
 ### � **Default Credentials**
 ```javascript
@@ -285,6 +306,31 @@ Email: user@demo.com
 Password: demo123
 Balance: $1,000
 Role: User
+
+### 📊 **Pre-seeded Database Content**
+The MongoDB setup automatically creates:
+- **5 Users** with realistic profiles and statistics
+- **3 Fixtures** (Premier League, Ligue 1) with live odds
+- **6 Bets** (pending, won, lost) with complete bet history
+- **6 Transactions** (deposits, withdrawals, bet settlements)
+- **1 Processed Result** with detailed match statistics
+- **Performance indexes** for optimal query speed
+
+**Test the data with:**
+```bash
+node database-inspector.js     # View all database content
+node check-bets.js            # Check bet collection specifically
+node test-mongodb-setup.js    # Test MongoDB connection
+```
+
+**Sample User Accounts from MongoDB:**
+```javascript
+// All demo users use password: admin123
+Email: john.doe@example.com     (Balance: €1,250.75)
+Email: marie.martin@example.fr  (Balance: €450.30)
+Email: carlos.rodriguez@example.es (Balance: €2,750.00)
+Email: emma.wilson@example.co.uk (Balance: €175.50)
+```
 ```
 
 ### 🐳 **Docker Deployment**

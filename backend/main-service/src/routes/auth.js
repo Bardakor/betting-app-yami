@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
+const Bet = require('../models/Bet');
 const passport = require('passport');
 const { auth } = require('../middleware/auth');
 const mongoose = require('mongoose');
@@ -871,6 +872,199 @@ router.get('/profile', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error fetching profile'
+    });
+  }
+});
+
+// @route   POST /auth/deposit
+// @desc    Deposit funds to user account
+// @access  Private
+router.post('/deposit', auth, async (req, res) => {
+  try {
+    const { amount, paymentMethod } = req.body;
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid amount. Amount must be greater than 0.'
+      });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const currentBalance = user.balance || 0;
+    const newBalance = currentBalance + parseFloat(amount);
+
+    user.balance = newBalance;
+    await user.save();
+
+    console.log(`💰 Deposit successful: ${user.email} deposited $${amount} (${paymentMethod})`);
+
+    res.json({
+      success: true,
+      message: `Successfully deposited $${amount}`,
+      userId: user._id,
+      oldBalance: currentBalance,
+      newBalance: newBalance,
+      amount: parseFloat(amount),
+      paymentMethod: paymentMethod || 'credit_card'
+    });
+  } catch (error) {
+    console.error('Deposit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process deposit'
+    });
+  }
+});
+
+// @route   POST /auth/place-bet
+// @desc    Place a bet
+// @access  Private
+router.post('/place-bet', auth, async (req, res) => {
+  try {
+    const { fixtureId, betType, selection, stake, odds } = req.body;
+    
+    if (!fixtureId || !betType || !selection || !stake || !odds) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: fixtureId, betType, selection, stake, odds'
+      });
+    }
+
+    if (stake <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stake must be greater than 0'
+      });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const currentBalance = user.balance || 0;
+    if (currentBalance < stake) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient balance'
+      });
+    }
+
+    // Deduct stake from user balance
+    const newBalance = currentBalance - stake;
+    user.balance = newBalance;
+    
+    // Update user stats
+    if (!user.stats) {
+      user.stats = {
+        totalBets: 0,
+        wonBets: 0,
+        lostBets: 0,
+        pendingBets: 0,
+        totalWinnings: 0,
+        totalLosses: 0
+      };
+    }
+    
+    user.stats.totalBets += 1;
+    user.stats.pendingBets += 1;
+    
+    await user.save();
+
+    // Calculate potential win
+    const potentialWin = stake * odds;
+
+    // Create bet document
+    const betId = `${fixtureId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const betData = {
+      userId: user._id,
+      betId: betId,
+      fixture: {
+        id: fixtureId,
+        date: new Date(Date.now() + 24 * 60 * 60 * 1000), // Mock future date
+        homeTeam: {
+          id: Math.floor(Math.random() * 1000),
+          name: 'Home Team',
+          logo: 'https://example.com/home-logo.png'
+        },
+        awayTeam: {
+          id: Math.floor(Math.random() * 1000),
+          name: 'Away Team',
+          logo: 'https://example.com/away-logo.png'
+        },
+        league: {
+          id: Math.floor(Math.random() * 100),
+          name: 'Premier League',
+          logo: 'https://example.com/league-logo.png',
+          country: 'England'
+        },
+        venue: {
+          name: 'Stadium Name',
+          city: 'London'
+        }
+      },
+      betType,
+      selection,
+      amount: stake,
+      odds,
+      potentialWinnings: potentialWin,
+      status: 'pending',
+      placedAt: new Date(),
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      isLiveBet: false,
+      cashout: {
+        available: false,
+        value: 0,
+        multiplier: 1
+      },
+      riskLevel: 'medium',
+      analytics: {
+        confidence: Math.floor(Math.random() * 40) + 60, // 60-100%
+        expectedValue: (potentialWin - stake).toFixed(2),
+        kellyPercentage: Math.floor(Math.random() * 10) + 5, // 5-15%
+        valueRating: stake > 50 ? 'high_stake' : 'normal'
+      }
+    };
+
+    // Save bet to database
+    const bet = await Bet.create(betData);
+
+    console.log(`🎲 Bet placed and saved: ${user.email} - $${stake} on ${betType} (${selection}) @${odds} - Bet ID: ${betId}`);
+
+    res.json({
+      success: true,
+      message: 'Bet placed successfully',
+      bet: {
+        id: bet.betId,
+        userId: user._id,
+        fixtureId,
+        betType,
+        selection,
+        stake,
+        odds,
+        potentialWin,
+        status: 'pending',
+        placedAt: bet.placedAt.toISOString()
+      },
+      newBalance: newBalance
+    });
+  } catch (error) {
+    console.error('Place bet error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to place bet'
     });
   }
 });
